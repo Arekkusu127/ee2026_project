@@ -20,26 +20,29 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module map_generation(input x_range = 640, input y_range = 480, input max_elevation = 25, input margin = 150, output [x_range-1:0] terrain);
+module map_generation(input clk, input rst, input [9:0] x_range = 10'd640, input [9:0] y_range = 10'd480, input [4:0] max_elevation = 5'd25, input [9:0] margin = 10'd150, output reg [9:0] terrain [0:1023]);
 
     // For each x coordinate, generate a random y coordinate within elevation of previous point
-    reg prev_y;
-    integer i;
+    reg [9:0] prev_y;
+    integer i = 0;
+    integer current_y;
 
-    always @(*) begin
-        prev_y = y_range / 2; // Start in the middle of the y range
-        for (i = 0; i < x_range; i = i + 1) begin
-            // Generate a random elevation change between -max_elevation and +max_elevation
-            // Update the current y coordinate based on the previous y and elevation change
-            integer current_y;
-            current_y = prev_y + ($random % (2 * max_elevation + 1)) - max_elevation;
-            // Ensure current_y stays within the bounds of 0 and y_range
-            if (current_y < margin) current_y = margin;
-            if (current_y > (y_range - margin)) current_y = (y_range - margin);
-            // Store the current y coordinate in the terrain output (this is a placeholder, actual implementation may vary)
-            terrain[i] = current_y; // Assuming terrain is an array that can hold y coordinates for each x
-            // Update prev_y for the next iteration
-            prev_y = current_y;
+    always @(posedge clk or posedge rst) begin
+        if (rst) begin
+            i <= 0;
+            prev_y <= y_range / 2; // Reset to middle of the y range
+        end else begin 
+            if (i < x_range) begin
+                // Generate random y coordinate based on previous y and max elevation
+                current_y = prev_y + ($random % (2 * max_elevation + 1)) - max_elevation; // Random change in elevation
+                // Ensure current_y is within bounds of y_range and margin
+                if (current_y < margin) current_y = margin;
+                if (current_y > y_range - margin) current_y = y_range - margin;
+                
+                terrain[i] <= current_y; // Store the generated y coordinate in the terrain array
+                prev_y <= current_y; // Update previous y for next iteration
+                i <= i + 1; // Move to the next x coordinate
+            end
         end
     end
 
