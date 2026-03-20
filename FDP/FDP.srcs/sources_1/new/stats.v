@@ -20,22 +20,18 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 
-module stats(input [1:0] entityType, output reg [15:0] stats_concat);
-    
-    reg [7:0] atk; reg [7:0] hp; 
+module stats(input [1:0] entityType, output reg [7:0] hp);
 
     always @(*) begin
         case (entityType)
             // Player model
-            2'd0: begin atk = 8'd100; hp = 8'd150; end
+            2'd0: hp = 8'd150;
             // Enemy models
-            2'd1: begin atk = 8'd100; hp = 8'd100; end
-            2'd2: begin atk = 8'd100; hp = 8'd200; end
+            2'd1: hp = 8'd100;
+            2'd2: hp = 8'd200;
             // Default case for undefined entity types
-            default: begin atk = 8'd0; hp = 8'd0; end
+            default: hp = 8'd0;
         endcase
-
-        stats_concat = {atk, hp};
     end
 
 endmodule
