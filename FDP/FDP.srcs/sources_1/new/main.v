@@ -13,254 +13,209 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module main(
-    input  clk,          // 100 MHz
-    input  btnU,         // angle up
-    input  btnD,         // angle down
-    input  btnL,         // power down
-    input  btnR,         // power up
-    input  btnC,         // fire / confirm
-    input  [15:0] sw,    // sw[3:0] skill select
-    output [7:0] seg,    // 7-segment cathodes
-    output [3:0] an,     // 7-segment anodes
-    output [15:0] led,   // debug LEDs
-    // OLED SPI
-    output oled_cs,
-    output oled_sdin,
-    output oled_sclk,
-    output oled_d_cn,
-    output oled_resn,
-    output oled_vccen,
-    output oled_pmoden
+    input         clk,
+    input         btnC,
+    input         BTNU,
+    input         BTND,
+    input         BTNL,
+    input         BTNR,
+    input  [15:0] sw,
+    output [15:0] led,
+    output [6:0]  seg,
+    output [3:0]  an,
+    output        dp,
+    output [7:0]  JC_out
 );
 
-    // -------------------------------------------------------
-    // Clock generation: 6.25 MHz for OLED SPI
-    // -------------------------------------------------------
-    reg [3:0] clk_div;
-    reg       clk_6p25;
-    always @(posedge clk) begin
-        clk_div <= clk_div + 1;
-        if (clk_div == 4'd15)
-            clk_6p25 <= ~clk_6p25;
-    end
+    wire rst = sw[15];
 
-    // -------------------------------------------------------
-    // Game tick (10 Hz) and animation tick (30 Hz)
-    // -------------------------------------------------------
-    wire tick_10hz, tick_30hz;
-    clk_divider #(.DIV(10_000_000)) u_tick10 (
-        .clk(clk), .rst(1'b0), .tick(tick_10hz)
+    // OLED individual signals
+    wire oled_cs, oled_sdin, oled_sclk, oled_dc, oled_res, oled_vccen, oled_pmoden;
+
+    // Map to JC_out bus:
+    // JC_out[0] = JC1 = CS
+    // JC_out[1] = JC2 = MOSI/SDA
+    // JC_out[2] = JC3 = unused
+    // JC_out[3] = JC4 = SCLK
+    // JC_out[4] = JC7 = D/C
+    // JC_out[5] = JC8 = RES
+    // JC_out[6] = JC9 = VCCEN
+    // JC_out[7] = JC10 = PMODEN
+    assign JC_out[0] = oled_cs;
+    assign JC_out[1] = oled_sdin;
+    assign JC_out[2] = 1'b0;
+    assign JC_out[3] = oled_sclk;
+    assign JC_out[4] = oled_dc;
+    assign JC_out[5] = oled_res;
+    assign JC_out[6] = oled_vccen;
+    assign JC_out[7] = oled_pmoden;
+
+    // ---- Clock generation ----
+    wire clk_25, clk_6p25;
+    clk_div clk_div_inst (
+        .clk100(clk),
+        .rst(rst),
+        .clk_25(clk_25),
+        .clk_6p25(clk_6p25)
     );
-    clk_divider #(.DIV(3_333_333)) u_tick30 (
-        .clk(clk), .rst(1'b0), .tick(tick_30hz)
+
+    // ---- Debounced buttons ----
+    wire fire_pulse, au_pulse, ad_pulse, al_pulse, ar_pulse;
+    debounce db_fire (.clk(clk), .rst(rst), .btn_in(btnC),  .btn_out(fire_pulse));
+    debounce db_au   (.clk(clk), .rst(rst), .btn_in(BTNU),  .btn_out(au_pulse));
+    debounce db_ad   (.clk(clk), .rst(rst), .btn_in(BTND),  .btn_out(ad_pulse));
+    debounce db_al   (.clk(clk), .rst(rst), .btn_in(BTNL),  .btn_out(al_pulse));
+    debounce db_ar   (.clk(clk), .rst(rst), .btn_in(BTNR),  .btn_out(ar_pulse));
+
+    // ---- Game state signals ----
+    wire [2:0]  game_phase;
+    wire [6:0]  player_x;
+    wire [5:0]  player_y;
+    wire [8:0]  player_hp;
+    wire [6:0]  player_angle;
+    wire [3:0]  player_power;
+    wire [3:0]  player_energy;
+    wire        current_round;
+    wire [2:0]  enemy_alive;
+    wire        proj_active;
+    wire [6:0]  proj_x;
+    wire [5:0]  proj_y;
+    wire        victory, defeat;
+
+    // Entity data buses (46 bits per entity)
+    wire [45:0] player_entity;
+    wire [45:0] enemy_entity_0;
+    wire [45:0] enemy_entity_1;
+    wire [45:0] enemy_entity_2;
+
+    // ---- Terrain RAM signals ----
+    wire [6:0]  terrain_rd_addr_a;
+    wire [5:0]  terrain_rd_data_a;
+    wire [6:0]  terrain_rd_addr_b;
+    wire [5:0]  terrain_rd_data_b;
+    wire        terrain_wr_en;
+    wire [6:0]  terrain_wr_addr;
+    wire [5:0]  terrain_wr_data;
+
+    terrain_ram terrain_inst (
+        .clk(clk),
+        .rd_addr_a(terrain_rd_addr_a),
+        .rd_data_a(terrain_rd_data_a),
+        .rd_addr_b(terrain_rd_addr_b),
+        .rd_data_b(terrain_rd_data_b),
+        .wr_en(terrain_wr_en),
+        .wr_addr(terrain_wr_addr),
+        .wr_data(terrain_wr_data)
     );
 
-    // -------------------------------------------------------
-    // OLED display
-    // -------------------------------------------------------
-    wire [12:0] pixel_index;   // 0..6143
-    wire        sample_pixel;
-    wire [15:0] oled_colour;
+    // ---- Game state FSM ----
+    game_state game_fsm (
+        .clk(clk),
+        .rst(rst),
+        .fire_btn(fire_pulse),
+        .angle_up(au_pulse),
+        .angle_down(ad_pulse),
+        .power_up(ar_pulse),
+        .power_down(al_pulse),
+        .skill_sel(sw[3:0]),
+        // terrain interface
+        .terrain_rd_addr_a(terrain_rd_addr_a),
+        .terrain_rd_data_a(terrain_rd_data_a),
+        .terrain_wr_en(terrain_wr_en),
+        .terrain_wr_addr(terrain_wr_addr),
+        .terrain_wr_data(terrain_wr_data),
+        // outputs
+        .game_phase(game_phase),
+        .player_x(player_x),
+        .player_y(player_y),
+        .player_hp(player_hp),
+        .player_angle(player_angle),
+        .player_power(player_power),
+        .player_energy(player_energy),
+        .current_round(current_round),
+        .player_entity(player_entity),
+        .enemy_entity_0(enemy_entity_0),
+        .enemy_entity_1(enemy_entity_1),
+        .enemy_entity_2(enemy_entity_2),
+        .enemy_alive(enemy_alive),
+        .proj_active(proj_active),
+        .proj_x(proj_x),
+        .proj_y(proj_y),
+        .victory(victory),
+        .defeat(defeat)
+    );
 
-    Oled_Display u_oled (
+    // ---- OLED pixel pipeline ----
+    wire        frame_begin, sending_pixels, sample_pixel;
+    wire [12:0] pixel_index;
+    wire [15:0] pixel_data;
+
+    wire [6:0] pix_x;
+    wire [5:0] pix_y;
+    assign pix_x = pixel_index % 96;
+    assign pix_y = pixel_index / 96;
+
+    // Port B for render reads
+    assign terrain_rd_addr_b = pix_x;
+
+    render render_inst (
+        .pix_x(pix_x),
+        .pix_y(pix_y),
+        .game_phase(game_phase),
+        .player_entity(player_entity),
+        .player_angle(player_angle),
+        .player_power(player_power),
+        .player_energy(player_energy),
+        .current_round(current_round),
+        .enemy_entity_0(enemy_entity_0),
+        .enemy_entity_1(enemy_entity_1),
+        .enemy_entity_2(enemy_entity_2),
+        .enemy_alive(enemy_alive),
+        .proj_active(proj_active),
+        .proj_x(proj_x),
+        .proj_y(proj_y),
+        .terrain_height(terrain_rd_data_b),
+        .victory(victory),
+        .defeat(defeat),
+        .pixel_data(pixel_data)
+    );
+
+    // ---- OLED display driver (UNTOUCHED) ----
+    Oled_Display oled_inst (
         .clk(clk_6p25),
-        .reset(1'b0),
-        .frame_begin(),
-        .sending_pixels(),
+        .reset(rst),
+        .frame_begin(frame_begin),
+        .sending_pixels(sending_pixels),
         .sample_pixel(sample_pixel),
         .pixel_index(pixel_index),
-        .pixel_data(oled_colour),
+        .pixel_data(pixel_data),
         .cs(oled_cs),
         .sdin(oled_sdin),
         .sclk(oled_sclk),
-        .d_cn(oled_d_cn),
-        .resn(oled_resn),
+        .d_cn(oled_dc),
+        .resn(oled_res),
         .vccen(oled_vccen),
         .pmoden(oled_pmoden)
     );
 
-    // -------------------------------------------------------
-    // Division-free pixel coordinate recovery
-    // -------------------------------------------------------
-    reg [6:0] px_x;  // 0..95
-    reg [5:0] px_y;  // 0..63
+    // ---- LED output ----
+    assign led[2:0]   = game_phase;
+    assign led[3]     = current_round;
+    assign led[6:4]   = enemy_alive;
+    assign led[7]     = proj_active;
+    assign led[8]     = victory;
+    assign led[9]     = defeat;
+    assign led[15:10] = player_angle[5:0];
 
-    always @(posedge clk_6p25) begin
-        if (pixel_index == 0) begin
-            px_x <= 0;
-            px_y <= 0;
-        end else if (sample_pixel) begin
-            if (px_x == 7'd95) begin
-                px_x <= 0;
-                px_y <= px_y + 1;
-            end else begin
-                px_x <= px_x + 1;
-            end
-        end
-    end
-
-    // -------------------------------------------------------
-    // Map generation
-    // -------------------------------------------------------
-    wire [575:0] terrain_flat;  // 96 x 6 bits
-    wire         map_done;
-
-    map_generation u_map (
+    // ---- 7-seg display ----
+    ss_display seg_inst (
         .clk(clk),
-        .rst(1'b0),
-        .seed(16'hACE1),
-        .terrain_flat(terrain_flat),
-        .done(map_done)
+        .rst(rst),
+        .player_hp(player_hp),
+        .player_power(player_power),
+        .seg(seg),
+        .an(an),
+        .dp(dp)
     );
-
-    // Unpack terrain locally
-    wire [5:0] terrain [0:95];
-    genvar gi;
-    generate
-        for (gi = 0; gi < 96; gi = gi + 1) begin : unpack_terrain
-            assign terrain[gi] = terrain_flat[gi*6 +: 6];
-        end
-    endgenerate
-
-    // -------------------------------------------------------
-    // Game state
-    // -------------------------------------------------------
-    wire [2:0]  phase;
-    wire        turn;          // 0 = player 0, 1 = player 1
-    wire [7:0]  angle;
-    wire [3:0]  power;
-    wire [4:0]  energy;
-    wire [15:0] hp_flat;       // 2 x 8 bits
-    wire        game_over;
-    wire        winner;
-
-    // Attack interface
-    wire        fire_trigger;
-    wire        hit_flag;
-    wire [7:0]  damage;
-    wire [3:0]  skill_id;
-
-    // Projectile position
-    wire [6:0]  proj_x;
-    wire [5:0]  proj_y;
-    wire        proj_active;
-
-    game_state u_gs (
-        .clk(clk),
-        .tick(tick_10hz),
-        .btnU(btnU),
-        .btnD(btnD),
-        .btnL(btnL),
-        .btnR(btnR),
-        .btnC(btnC),
-        .sw(sw[3:0]),
-        .terrain_flat(terrain_flat),
-        .map_done(map_done),
-        .hit_flag(hit_flag),
-        .damage(damage),
-        .proj_active(proj_active),
-        .phase(phase),
-        .turn(turn),
-        .angle(angle),
-        .power(power),
-        .energy(energy),
-        .hp_flat(hp_flat),
-        .fire_trigger(fire_trigger),
-        .skill_id(skill_id),
-        .game_over(game_over),
-        .winner(winner)
-    );
-
-    wire [7:0] hp0 = hp_flat[7:0];
-    wire [7:0] hp1 = hp_flat[15:8];
-
-    // -------------------------------------------------------
-    // Player positions (fixed for now)
-    // -------------------------------------------------------
-    wire [6:0] p0_x = 7'd15;
-    wire [5:0] p0_y = terrain[15] - 6'd3;
-    wire [6:0] p1_x = 7'd80;
-    wire [5:0] p1_y = terrain[80] - 6'd3;
-
-    // -------------------------------------------------------
-    // Attack / projectile
-    // -------------------------------------------------------
-    attack u_atk (
-        .clk(clk),
-        .tick(tick_30hz),
-        .fire(fire_trigger),
-        .angle(angle),
-        .power(power),
-        .skill_id(skill_id),
-        .start_x(turn ? p1_x : p0_x),
-        .start_y(turn ? p1_y : p0_y),
-        .target_x(turn ? p0_x : p1_x),
-        .target_y(turn ? p0_y : p1_y),
-        .terrain_flat(terrain_flat),
-        .proj_x(proj_x),
-        .proj_y(proj_y),
-        .proj_active(proj_active),
-        .hit(hit_flag),
-        .damage(damage)
-    );
-
-    // -------------------------------------------------------
-    // Pixel rendering
-    // -------------------------------------------------------
-    render u_render (
-        .px_x(px_x),
-        .px_y(px_y),
-        .terrain_flat(terrain_flat),
-        .p0_x(p0_x), .p0_y(p0_y),
-        .p1_x(p1_x), .p1_y(p1_y),
-        .hp0(hp0), .hp1(hp1),
-        .proj_x(proj_x), .proj_y(proj_y),
-        .proj_active(proj_active),
-        .turn(turn),
-        .angle(angle),
-        .power(power),
-        .energy(energy),
-        .phase(phase),
-        .game_over(game_over),
-        .winner(winner),
-        .colour(oled_colour)
-    );
-
-    // -------------------------------------------------------
-    // 7-segment: show angle ones digit
-    // -------------------------------------------------------
-    reg [6:0] seg_pattern;
-    wire [3:0] angle_ones = angle % 10;
-
-    always @(*) begin
-        case (angle_ones)
-            4'd0: seg_pattern = 7'b1000000;
-            4'd1: seg_pattern = 7'b1111001;
-            4'd2: seg_pattern = 7'b0100100;
-            4'd3: seg_pattern = 7'b0110000;
-            4'd4: seg_pattern = 7'b0011001;
-            4'd5: seg_pattern = 7'b0010010;
-            4'd6: seg_pattern = 7'b0000010;
-            4'd7: seg_pattern = 7'b1111000;
-            4'd8: seg_pattern = 7'b0000000;
-            4'd9: seg_pattern = 7'b0010000;
-            default: seg_pattern = 7'b1111111;
-        endcase
-    end
-
-    assign seg = {1'b1, seg_pattern};  // dp off
-    assign an  = 4'b1110;              // rightmost digit
-
-    // -------------------------------------------------------
-    // Debug LEDs
-    // -------------------------------------------------------
-    assign led[2:0]   = phase;
-    assign led[3]     = turn;
-    assign led[4]     = fire_trigger;
-    assign led[5]     = proj_active;
-    assign led[6]     = hit_flag;
-    assign led[7]     = game_over;
-    assign led[11:8]  = energy[3:0];
-    assign led[15:12] = skill_id;
 
 endmodule

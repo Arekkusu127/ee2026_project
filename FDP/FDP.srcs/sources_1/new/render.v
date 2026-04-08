@@ -1,143 +1,175 @@
 `timescale 1ns / 1ps
 
 module render(
-    input  [6:0]  px_x,
-    input  [5:0]  px_y,
-    input  [575:0] terrain_flat,
-    input  [6:0]  p0_x,
-    input  [5:0]  p0_y,
-    input  [6:0]  p1_x,
-    input  [5:0]  p1_y,
-    input  [7:0]  hp0,
-    input  [7:0]  hp1,
+    input  [6:0]  pix_x,
+    input  [5:0]  pix_y,
+    input  [2:0]  game_phase,
+    input  [45:0] player_entity,
+    input  [6:0]  player_angle,
+    input  [3:0]  player_power,
+    input  [3:0]  player_energy,
+    input         current_round,
+    input  [45:0] enemy_entity_0,
+    input  [45:0] enemy_entity_1,
+    input  [45:0] enemy_entity_2,
+    input  [2:0]  enemy_alive,
+    input         proj_active,
     input  [6:0]  proj_x,
     input  [5:0]  proj_y,
-    input         proj_active,
-    input         turn,
-    input  [7:0]  angle,
-    input  [3:0]  power,
-    input  [4:0]  energy,
-    input  [2:0]  phase,
-    input         game_over,
-    input         winner,
-    output reg [15:0] colour
+    input  [5:0]  terrain_height,
+    input         victory,
+    input         defeat,
+    output reg [15:0] pixel_data
 );
 
-    // Unpack terrain
-    wire [5:0] terrain [0:95];
-    genvar i;
-    generate
-        for (i = 0; i < 96; i = i + 1) begin : unpack_t
-            assign terrain[i] = terrain_flat[i*6 +: 6];
-        end
-    endgenerate
+    // Extract fields from entities
+    // [19:13] PosX, [12:7] PosY, [6:3] half_width, [2:0] half_height
+    // [45:44] TYPE, [43:38] HP
 
-    // Colours (RGB565)
-    localparam SKY_BLUE    = 16'h867F;  // light blue sky
-    localparam GROUND_GRN  = 16'h07E0;  // green terrain
-    localparam DIRT_BRN    = 16'h8A22;  // brown below surface
-    localparam P0_COLOUR   = 16'h001F;  // blue player
-    localparam P1_COLOUR   = 16'hF800;  // red player
-    localparam PROJ_WHITE  = 16'hFFFF;
-    localparam HP_GREEN    = 16'h07E0;
-    localparam HP_RED      = 16'hF800;
-    localparam HP_BG       = 16'h4208;  // dark gray
-    localparam BAR_YELLOW  = 16'hFFE0;
-    localparam BAR_CYAN    = 16'h07FF;
-    localparam ENERGY_GOLD = 16'hFEA0;
-    localparam TURN_IND    = 16'hFFFF;
-    localparam GAMEOVER_BG = 16'h0000;
-    localparam WIN_TEXT    = 16'hFFE0;
+    wire [6:0] px  = player_entity[19:13];
+    wire [5:0] py  = player_entity[12:7];
+    wire [3:0] phw = player_entity[6:3];
+    wire [2:0] phh = player_entity[2:0];
+    wire [5:0] php = player_entity[43:38]; // scaled HP for display
 
-    // HP bar width calculation: (hp * 41) >> 6 approximates hp * 96 / 150
-    wire [6:0] hp0_bar = (hp0 * 41) >> 6;
-    wire [6:0] hp1_bar = (hp1 * 41) >> 6;
+    wire [6:0] ex0 = enemy_entity_0[19:13];
+    wire [5:0] ey0 = enemy_entity_0[12:7];
+    wire [3:0] ehw0 = enemy_entity_0[6:3];
+    wire [2:0] ehh0 = enemy_entity_0[2:0];
+    wire [5:0] ehp0 = enemy_entity_0[43:38];
+    wire [1:0] et0  = enemy_entity_0[45:44];
 
-    // Terrain height at current x
-    wire [5:0] t_height = (px_x < 7'd96) ? terrain[px_x] : 6'd63;
+    wire [6:0] ex1 = enemy_entity_1[19:13];
+    wire [5:0] ey1 = enemy_entity_1[12:7];
+    wire [3:0] ehw1 = enemy_entity_1[6:3];
+    wire [2:0] ehh1 = enemy_entity_1[2:0];
+    wire [5:0] ehp1 = enemy_entity_1[43:38];
 
-    // Player 0 sprite: 3x5 box
-    wire in_p0 = (px_x >= p0_x - 1) && (px_x <= p0_x + 1) &&
-                 (px_y >= p0_y - 2) && (px_y <= p0_y + 2);
+    wire [6:0] ex2 = enemy_entity_2[19:13];
+    wire [5:0] ey2 = enemy_entity_2[12:7];
+    wire [3:0] ehw2 = enemy_entity_2[6:3];
+    wire [2:0] ehh2 = enemy_entity_2[2:0];
+    wire [5:0] ehp2 = enemy_entity_2[43:38];
 
-    // Player 1 sprite: 3x5 box
-    wire in_p1 = (px_x >= p1_x - 1) && (px_x <= p1_x + 1) &&
-                 (px_y >= p1_y - 2) && (px_y <= p1_y + 2);
+    // Colors (RGB565)
+    localparam C_TERRAIN  = 16'h07E0;
+    localparam C_PLAYER   = 16'hFFE0;
+    localparam C_MINION   = 16'hF800;
+    localparam C_BOSS     = 16'hF81F;
+    localparam C_PROJ     = 16'hFFFF;
+    localparam C_HP_BAR   = 16'h07E0;
+    localparam C_HP_BG    = 16'h4208;
+    localparam C_ENERGY   = 16'h001F;
+    localparam C_HUD_BG   = 16'h0000;
+    localparam C_VICTORY  = 16'hFFE0;
+    localparam C_DEFEAT   = 16'hF800;
+
+    // Player sprite: using entity half_width and half_height
+    wire player_hit = (px >= {3'd0, phw}) && (py >= {3'd0, phh}) &&
+                      (pix_x >= px - {3'd0, phw}) && (pix_x <= px + {3'd0, phw}) &&
+                      (pix_y >= py - {3'd0, phh}) && (pix_y <= py + {3'd0, phh});
+
+    // Enemy 0 sprite (minion or boss, using its own dimensions)
+    wire enemy0_hit = enemy_alive[0] &&
+                      (ex0 >= {3'd0, ehw0}) && (ey0 >= {3'd0, ehh0}) &&
+                      (pix_x >= ex0 - {3'd0, ehw0}) && (pix_x <= ex0 + {3'd0, ehw0}) &&
+                      (pix_y >= ey0 - {3'd0, ehh0}) && (pix_y <= ey0 + {3'd0, ehh0});
+
+    // Enemy 1 sprite (minion only in round 1)
+    wire enemy1_hit = enemy_alive[1] && !current_round &&
+                      (ex1 >= {3'd0, ehw1}) && (ey1 >= {3'd0, ehh1}) &&
+                      (pix_x >= ex1 - {3'd0, ehw1}) && (pix_x <= ex1 + {3'd0, ehw1}) &&
+                      (pix_y >= ey1 - {3'd0, ehh1}) && (pix_y <= ey1 + {3'd0, ehh1});
+
+    // Enemy 2 sprite (minion only in round 1)
+    wire enemy2_hit = enemy_alive[2] && !current_round &&
+                      (ex2 >= {3'd0, ehw2}) && (ey2 >= {3'd0, ehh2}) &&
+                      (pix_x >= ex2 - {3'd0, ehw2}) && (pix_x <= ex2 + {3'd0, ehw2}) &&
+                      (pix_y >= ey2 - {3'd0, ehh2}) && (pix_y <= ey2 + {3'd0, ehh2});
+
+    // Color selection based on entity type
+    wire [15:0] enemy0_color = (et0 == 2'b10) ? C_BOSS : C_MINION;
 
     // Projectile: 2x2
-    wire in_proj = proj_active &&
-                   (px_x >= proj_x) && (px_x <= proj_x + 1) &&
-                   (px_y >= proj_y) && (px_y <= proj_y + 1);
+    wire proj_hit = proj_active &&
+                    (pix_x >= proj_x) && (pix_x <= proj_x + 7'd1) &&
+                    (pix_y >= proj_y) && (pix_y <= proj_y + 6'd1);
 
-    // HUD regions (top 8 rows)
-    // Row 0-1: HP bars (player 0 left half, player 1 right half)
-    wire in_hp0_region = (px_y <= 6'd1) && (px_x < 7'd48);
-    wire in_hp1_region = (px_y <= 6'd1) && (px_x >= 7'd48);
-    wire in_hp0_fill   = in_hp0_region && (px_x < hp0_bar[6:0]);
-    wire in_hp1_fill   = in_hp1_region && ((px_x - 7'd48) < hp1_bar[6:0]);
+    // Terrain
+    wire terrain_hit = (pix_y >= terrain_height);
 
-    // Row 2-3: angle bar (width = angle * 96 / 90, approximate as (angle * 17) >> 4)
-    wire [6:0] angle_bar_w = (angle * 17) >> 4;
-    wire in_angle_bar = (px_y >= 6'd2) && (px_y <= 6'd3) && (px_x < angle_bar_w);
+    // HUD region (top 5 rows)
+    wire hud_region = (pix_y < 6'd5);
 
-    // Row 4-5: power bar (width = power * 10, max 100 -> clamp at 96)
-    wire [6:0] power_bar_w = (power > 4'd9) ? 7'd96 : {3'b0, power} * 7'd10;
-    wire in_power_bar = (px_y >= 6'd4) && (px_y <= 6'd5) && (px_x < power_bar_w);
+    // Player HP bar: row 1, cols 1..20 (php is 0..63, scale to 20px)
+    wire hp_bar_bg = (pix_y == 6'd1) && (pix_x >= 7'd1) && (pix_x <= 7'd20);
+    // php max = ~50 for full HP. Scale: fill = php * 20 / 50 ≈ php * 2 / 5
+    wire [6:0] hp_fill_wide = {1'b0, php} + {1'b0, php} + {1'b0, php};  // php*3
+    wire [4:0] hp_fill_len = (hp_fill_wide[6:2] > 5'd20) ? 5'd20 : hp_fill_wide[6:2]; // /4 approx, clamp to 20
+    wire hp_bar_fill = hp_bar_bg && (pix_x <= {2'd0, hp_fill_len});
 
-    // Row 6-7: energy dots (each dot = 2px wide, 2px tall, up to 16)
-    wire [4:0] energy_dot_idx = px_x[6:1]; // which dot (0..47, but only 0..15 matter)
-    wire in_energy = (px_y >= 6'd6) && (px_y <= 6'd7) && 
-                     (energy_dot_idx < energy) && (px_x < 7'd32);
+    // Energy bar: row 3, cols 1..12
+    wire en_bar_bg   = (pix_y == 6'd3) && (pix_x >= 7'd1) && (pix_x <= 7'd12);
+    wire en_bar_fill = en_bar_bg && (pix_x <= {3'd0, player_energy});
 
-    // Turn indicator: small arrow above active player
-    wire [6:0] active_x = turn ? p1_x : p0_x;
-    wire [5:0] active_y = turn ? p1_y : p0_y;
-    wire in_turn_ind = (px_x >= active_x - 1) && (px_x <= active_x + 1) &&
-                       (px_y == active_y - 6'd4);
+    // Gameover banner
+    wire gameover_banner = (game_phase == 3'd6) &&
+                           (pix_x >= 7'd28) && (pix_x <= 7'd68) &&
+                           (pix_y >= 6'd25) && (pix_y <= 6'd38);
 
-    // Game over overlay
-    wire in_gameover_box = game_over &&
-                           (px_x >= 7'd20) && (px_x <= 7'd75) &&
-                           (px_y >= 6'd24) && (px_y <= 6'd40);
-    // Simple "P0" or "P1" winner indicator (just coloured block)
-    wire in_winner_text = game_over &&
-                          (px_x >= 7'd38) && (px_x <= 7'd58) &&
-                          (px_y >= 6'd28) && (px_y <= 6'd36);
+    // Enemy HP mini-bars (1 pixel high, above sprite)
+    wire e0_hpbar = enemy_alive[0] &&
+                    (ey0 > {3'd0, ehh0} + 6'd1) &&
+                    (pix_y == ey0 - {3'd0, ehh0} - 6'd2) &&
+                    (pix_x >= (ex0 >= {3'd0, ehw0} ? ex0 - {3'd0, ehw0} : 7'd0)) &&
+                    (pix_x <= ex0 + {3'd0, ehw0});
+    wire e1_hpbar = enemy_alive[1] && !current_round &&
+                    (ey1 > {3'd0, ehh1} + 6'd1) &&
+                    (pix_y == ey1 - {3'd0, ehh1} - 6'd2) &&
+                    (pix_x >= (ex1 >= {3'd0, ehw1} ? ex1 - {3'd0, ehw1} : 7'd0)) &&
+                    (pix_x <= ex1 + {3'd0, ehw1});
+    wire e2_hpbar = enemy_alive[2] && !current_round &&
+                    (ey2 > {3'd0, ehh2} + 6'd1) &&
+                    (pix_y == ey2 - {3'd0, ehh2} - 6'd2) &&
+                    (pix_x >= (ex2 >= {3'd0, ehw2} ? ex2 - {3'd0, ehw2} : 7'd0)) &&
+                    (pix_x <= ex2 + {3'd0, ehw2});
 
-    // Priority-based pixel mux
+    // Sky gradient
+    wire [4:0] sky_r = 5'd0;
+    wire [5:0] sky_g = {1'b0, pix_y[5:1]};
+    wire [4:0] sky_b = 5'd31 - pix_y[5:1];
+    wire [15:0] sky_color = {sky_r, sky_g, sky_b};
+
+    // ---- 11-layer Priority Mux ----
     always @(*) begin
-        if (in_gameover_box) begin
-            if (in_winner_text)
-                colour = winner ? P1_COLOUR : P0_COLOUR;
+        if (gameover_banner)
+            pixel_data = victory ? C_VICTORY : C_DEFEAT;
+        else if (hud_region) begin
+            if (hp_bar_fill)
+                pixel_data = C_HP_BAR;
+            else if (hp_bar_bg)
+                pixel_data = C_HP_BG;
+            else if (en_bar_fill)
+                pixel_data = C_ENERGY;
+            else if (en_bar_bg)
+                pixel_data = C_HP_BG;
             else
-                colour = GAMEOVER_BG;
+                pixel_data = C_HUD_BG;
         end
-        else if (in_turn_ind)
-            colour = TURN_IND;
-        else if (in_hp0_region)
-            colour = in_hp0_fill ? HP_GREEN : HP_BG;
-        else if (in_hp1_region)
-            colour = in_hp1_fill ? HP_GREEN : HP_BG;
-        else if (in_angle_bar)
-            colour = BAR_YELLOW;
-        else if (in_power_bar)
-            colour = BAR_CYAN;
-        else if (in_energy)
-            colour = ENERGY_GOLD;
-        else if (in_proj)
-            colour = PROJ_WHITE;
-        else if (in_p0)
-            colour = P0_COLOUR;
-        else if (in_p1)
-            colour = P1_COLOUR;
-        else if (px_y >= t_height) begin
-            if (px_y == t_height)
-                colour = GROUND_GRN;
-            else
-                colour = DIRT_BRN;
-        end
+        else if (proj_hit)
+            pixel_data = C_PROJ;
+        else if (e0_hpbar || e1_hpbar || e2_hpbar)
+            pixel_data = C_HP_BAR;
+        else if (player_hit)
+            pixel_data = C_PLAYER;
+        else if (enemy0_hit)
+            pixel_data = enemy0_color;
+        else if (enemy1_hit || enemy2_hit)
+            pixel_data = C_MINION;
+        else if (terrain_hit)
+            pixel_data = C_TERRAIN;
         else
-            colour = SKY_BLUE;
+            pixel_data = sky_color;
     end
 
 endmodule
