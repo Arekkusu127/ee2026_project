@@ -20,43 +20,38 @@
 //////////////////////////////////////////////////////////////////////////////////
 
 module stats(
-    input [1:0] entityType,
-    output reg [7:0] hp,
-    output reg [5:0] def_stat,
-    output reg [5:0] atk_stat,
-    output reg [3:0] half_width,
-    output reg [3:0] half_height
+    input  [3:0] entity_id,   // 0 = player0, 1 = player1, 2+ = enemies
+    output reg [7:0] base_hp,
+    output reg [7:0] base_atk,
+    output reg [7:0] base_def,
+    output reg [2:0] width,    // half-width in pixels
+    output reg [2:0] height    // half-height in pixels
 );
+
     always @(*) begin
-        case (entityType)
-            2'd0: begin
-                hp = 8'd150;
-                def_stat = 6'd5;
-                atk_stat = 6'd10;
-                half_width = 4'd3;
-                half_height = 4'd3;
+        case (entity_id)
+            4'd0: begin  // Player 0
+                base_hp  = 8'd150;
+                base_atk = 8'd20;
+                base_def = 8'd5;
+                width    = 3'd1;
+                height   = 3'd2;
             end
-            2'd1: begin
-                hp = 8'd100;
-                def_stat = 6'd3;
-                atk_stat = 6'd8;
-                half_width = 4'd2;
-                half_height = 4'd2;
-            end
-            2'd2: begin
-                hp = 8'd200;
-                def_stat = 6'd8;
-                atk_stat = 6'd12;
-                half_width = 4'd4;
-                half_height = 4'd4;
+            4'd1: begin  // Player 1
+                base_hp  = 8'd150;
+                base_atk = 8'd20;
+                base_def = 8'd5;
+                width    = 3'd1;
+                height   = 3'd2;
             end
             default: begin
-                hp = 8'd0;
-                def_stat = 6'd0;
-                atk_stat = 6'd0;
-                half_width = 4'd0;
-                half_height = 4'd0;
+                base_hp  = 8'd100;
+                base_atk = 8'd15;
+                base_def = 8'd3;
+                width    = 3'd1;
+                height   = 3'd2;
             end
         endcase
     end
+
 endmodule

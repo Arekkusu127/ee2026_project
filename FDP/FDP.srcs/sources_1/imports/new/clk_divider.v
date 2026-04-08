@@ -19,25 +19,27 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-
-`timescale 1ns / 1ps
-
-module clk_divider(
-    input clk,
-    input [31:0] divisor,
-    output reg tick = 0
+module clk_divider #(
+    parameter DIV = 10_000_000
+)(
+    input  clk,
+    input  rst,
+    output tick
 );
 
-    reg [31:0] counter = 0;
+    reg [31:0] count;
 
     always @(posedge clk) begin
-        if (counter >= divisor - 1) begin
-            counter <= 0;
-            tick <= 1'b1;
-        end else begin
-            counter <= counter + 1;
-            tick <= 1'b0;
-        end
+        if (rst)
+            count <= 0;
+        else if (count >= DIV - 1)
+            count <= 0;
+        else
+            count <= count + 1;
     end
+
+    assign tick = (count == 0);
+
 endmodule
+
 

@@ -19,84 +19,50 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-module map_generation #(
-    parameter X_RANGE = 95,
-    parameter Y_RANGE = 63,
-    parameter MAX_ELEVATION = 6,
-    parameter TOP_MARGIN = 20,
-    parameter BOTTOM_MARGIN = 5,
-    parameter EDGE_FLAT = 10
-)(
-    input clk,
-    input rst,
-    output reg [5:0] terrain [0:95]
+module map_generation(
+    input         clk,
+    input         rst,
+    input  [15:0] seed,
+    output [575:0] terrain_flat,  // 96 x 6 bits packed
+    output reg    done
 );
 
-    reg [5:0] prev_y;
-    reg [6:0] i;
-    reg done;
-
-    // LFSR for pseudo-random number generation
+    reg [5:0] terrain [0:95];
     reg [15:0] lfsr;
+    reg [6:0]  idx;
+    reg        generating;
 
-    integer current_y;
-    integer left_idx;
-    integer right_idx;
-    integer low_limit;
-    integer high_limit;
-    integer edge_y;
-    integer half;
-    integer rand_offset;
+    // Pack output
+    genvar i;
+    generate
+        for (i = 0; i < 96; i = i + 1) begin : pack_terrain
+            assign terrain_flat[i*6 +: 6] = terrain[i];
+        end
+    endgenerate
 
-    always @(posedge clk or posedge rst) begin
+    always @(posedge clk) begin
         if (rst) begin
-            i <= 0;
+            lfsr <= seed;
+            idx  <= 0;
             done <= 0;
-            lfsr <= 16'hACE1;
+            generating <= 1;
+        end else if (generating) begin
+            // LFSR step: taps at 16,15,13,4 (x^16+x^15+x^13+x^4+1)
+            lfsr <= {lfsr[14:0], lfsr[15] ^ lfsr[14] ^ lfsr[12] ^ lfsr[3]};
 
-            low_limit = TOP_MARGIN;
-            high_limit = Y_RANGE - BOTTOM_MARGIN;
-            if (high_limit < low_limit) high_limit = low_limit;
+            // Terrain height: base 32, variation ±16 using top 5 bits
+            // Range: 20..52 within 0..63
+            terrain[idx] <= 6'd28 + lfsr[15:11] - 5'd16;
 
-            prev_y <= high_limit[5:0];
-        end else if (!done) begin
-            // Advance LFSR every cycle (taps: 16,14,13,11)
-            lfsr <= {lfsr[14:0], lfsr[15] ^ lfsr[13] ^ lfsr[12] ^ lfsr[10]};
-
-            low_limit = TOP_MARGIN;
-            high_limit = Y_RANGE - BOTTOM_MARGIN;
-            if (high_limit < low_limit) high_limit = low_limit;
-            edge_y = high_limit;
-
-            half = (X_RANGE + 2) >> 1;
-
-            if (i < half) begin
-                left_idx = i;
-                right_idx = X_RANGE - i;
-
-                if (left_idx < EDGE_FLAT) begin
-                    current_y = edge_y;
-                end else begin
-                    // Use LFSR bits for random walk: range [-MAX_ELEVATION, +MAX_ELEVATION]
-                    // lfsr[3:0] gives 0-15, subtract MAX_ELEVATION, then clamp
-                    rand_offset = lfsr[3:0];
-                    if (rand_offset > (2 * MAX_ELEVATION))
-                        rand_offset = 2 * MAX_ELEVATION;
-                    current_y = prev_y + rand_offset - MAX_ELEVATION;
-
-                    if (current_y < low_limit) current_y = low_limit;
-                    if (current_y > high_limit) current_y = high_limit;
-                end
-
-                terrain[left_idx] <= current_y[5:0];
-                if (right_idx != left_idx)
-                    terrain[right_idx] <= current_y[5:0];
-
-                prev_y <= current_y[5:0];
-                i <= i + 1;
-            end else begin
+            if (idx == 7'd95) begin
+                generating <= 0;
                 done <= 1;
+            end else begin
+                idx <= idx + 1;
             end
         end
     end
+
+    // Smoothing pass would require second state - keep simple for now
+
 endmodule
