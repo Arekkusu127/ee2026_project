@@ -1,7 +1,7 @@
 Copyright 1986-2018 Xilinx, Inc. All Rights Reserved.
 ----------------------------------------------------------------------------------------------------------------------------------
 | Tool Version     : Vivado v.2018.2 (win64) Build 2258646 Thu Jun 14 20:03:12 MDT 2018
-| Date             : Wed Apr  8 18:55:54 2026
+| Date             : Wed Apr  8 20:21:42 2026
 | Host             : LAPTOP-TX5PRO running 64-bit major release  (build 9200)
 | Command          : report_power -file main_power_routed.rpt -pb main_power_summary_routed.pb -rpx main_power_routed.rpx
 | Design           : main
@@ -30,10 +30,10 @@ Table of Contents
 ----------
 
 +--------------------------+--------------+
-| Total On-Chip Power (W)  | 0.103        |
+| Total On-Chip Power (W)  | 0.105        |
 | Design Power Budget (W)  | Unspecified* |
 | Power Budget Margin (W)  | NA           |
-| Dynamic (W)              | 0.031        |
+| Dynamic (W)              | 0.033        |
 | Device Static (W)        | 0.072        |
 | Effective TJA (C/W)      | 5.0          |
 | Max Ambient (C)          | 84.5         |
@@ -52,19 +52,20 @@ Table of Contents
 +----------------+-----------+----------+-----------+-----------------+
 | On-Chip        | Power (W) | Used     | Available | Utilization (%) |
 +----------------+-----------+----------+-----------+-----------------+
-| Clocks         |     0.003 |        3 |       --- |             --- |
-| Slice Logic    |     0.006 |     2516 |       --- |             --- |
-|   LUT as Logic |     0.005 |     1347 |     20800 |            6.48 |
-|   CARRY4       |    <0.001 |      175 |      8150 |            2.15 |
-|   Register     |    <0.001 |      560 |     41600 |            1.35 |
+| Clocks         |     0.004 |        3 |       --- |             --- |
+| Slice Logic    |     0.009 |     3388 |       --- |             --- |
+|   LUT as Logic |     0.008 |     1873 |     20800 |            9.00 |
+|   CARRY4       |    <0.001 |      243 |      8150 |            2.98 |
+|   Register     |    <0.001 |      646 |     41600 |            1.55 |
 |   BUFG         |    <0.001 |        1 |        32 |            3.13 |
-|   F7/F8 Muxes  |    <0.001 |       15 |     32600 |            0.05 |
-|   Others       |     0.000 |       24 |       --- |             --- |
-| Signals        |     0.005 |     1922 |       --- |             --- |
+|   F7/F8 Muxes  |    <0.001 |       14 |     32600 |            0.04 |
+|   Others       |     0.000 |       26 |       --- |             --- |
+| Signals        |     0.007 |     2585 |       --- |             --- |
 | Block RAM      |     0.002 |        1 |        50 |            2.00 |
-| I/O            |     0.016 |       47 |       106 |           44.34 |
+| DSPs           |    <0.001 |        2 |        90 |            2.22 |
+| I/O            |     0.011 |       58 |       106 |           54.72 |
 | Static Power   |     0.072 |          |           |                 |
-| Total          |     0.103 |          |           |                 |
+| Total          |     0.105 |          |           |                 |
 +----------------+-----------+----------+-----------+-----------------+
 
 
@@ -74,9 +75,9 @@ Table of Contents
 +-----------+-------------+-----------+-------------+------------+
 | Source    | Voltage (V) | Total (A) | Dynamic (A) | Static (A) |
 +-----------+-------------+-----------+-------------+------------+
-| Vccint    |       1.000 |     0.025 |       0.015 |      0.010 |
-| Vccaux    |       1.800 |     0.013 |       0.001 |      0.013 |
-| Vcco33    |       3.300 |     0.005 |       0.004 |      0.001 |
+| Vccint    |       1.000 |     0.031 |       0.022 |      0.010 |
+| Vccaux    |       1.800 |     0.013 |       0.000 |      0.013 |
+| Vcco33    |       3.300 |     0.004 |       0.003 |      0.001 |
 | Vcco25    |       2.500 |     0.000 |       0.000 |      0.000 |
 | Vcco18    |       1.800 |     0.000 |       0.000 |      0.000 |
 | Vcco15    |       1.500 |     0.000 |       0.000 |      0.000 |
@@ -143,20 +144,21 @@ Table of Contents
 +----------------+-----------+
 | Name           | Power (W) |
 +----------------+-----------+
-| main           |     0.031 |
+| main           |     0.033 |
 |   clk_div_inst |    <0.001 |
 |   db_ad        |    <0.001 |
 |   db_al        |    <0.001 |
 |   db_ar        |    <0.001 |
 |   db_au        |    <0.001 |
 |   db_fire      |    <0.001 |
-|   game_fsm     |     0.007 |
+|   game_fsm     |     0.009 |
 |     cos_inst   |    <0.001 |
 |     lfsr_inst  |    <0.001 |
 |     sin_inst   |    <0.001 |
-|   oled_inst    |     0.004 |
-|   seg_inst     |    <0.001 |
-|   terrain_inst |     0.002 |
+|   oled_inst    |     0.006 |
+|   render_inst  |    <0.001 |
+|   seg_inst     |     0.001 |
+|   terrain_inst |     0.003 |
 +----------------+-----------+
 
 

@@ -2,15 +2,15 @@
 
 /*
 Entity data format (46 bits):
-[45:44] TYPE       - 00=player, 01=minion, 10=boss
-[43:38] HP         - 6 bits (0-63, scaled: real_hp = val * hp_scale)
-[37:32] DEF        - 6 bits
-[31:26] ATK        - 6 bits
-[25:20] MP         - 6 bits
-[19:13] PosX       - 7 bits (0-95)
-[12:7]  PosY       - 6 bits (0-63)
-[6:3]   half_width - 4 bits
-[2:0]   half_height- 3 bits
+[45:44] TYPE
+[43:38] HP
+[37:32] DEF
+[31:26] ATK
+[25:20] MP
+[19:13] PosX
+[12:7]  PosY
+[6:3]   half_width
+[2:0]   half_height
 */
 
 module game_state(
@@ -21,6 +21,9 @@ module game_state(
     input         angle_down,
     input         power_up,
     input         power_down,
+    input         move_left,
+    input         move_right,
+    input         confirm_aim,
     input  [3:0]  skill_sel,
     // terrain RAM port A
     output reg [6:0]  terrain_rd_addr_a,
@@ -36,8 +39,8 @@ module game_state(
     output reg [6:0]  player_angle,
     output reg [3:0]  player_power,
     output reg [3:0]  player_energy,
+    output reg [3:0]  player_fuel,
     output reg        current_round,
-    // Entity data outputs (46 bits each)
     output reg [45:0] player_entity,
     output reg [45:0] enemy_entity_0,
     output reg [45:0] enemy_entity_1,
@@ -47,7 +50,9 @@ module game_state(
     output reg [6:0]  proj_x,
     output reg [5:0]  proj_y,
     output reg        victory,
-    output reg        defeat
+    output reg        defeat,
+    output reg        hit_event,
+    output reg [7:0]  hit_damage
 );
 
     // Game phases
@@ -58,14 +63,13 @@ module game_state(
     localparam PH_RESOLVE  = 3'd4;
     localparam PH_NEXTTURN = 3'd5;
     localparam PH_GAMEOVER = 3'd6;
+    localparam PH_MOVE     = 3'd7;  // NEW: Movement phase before aiming
 
-    // Entity TYPE codes
     localparam TYPE_PLAYER = 2'b00;
     localparam TYPE_MINION = 2'b01;
     localparam TYPE_BOSS   = 2'b10;
 
-    // ---- Entity field helpers ----
-    // Pack entity: {TYPE[1:0], HP[5:0], DEF[5:0], ATK[5:0], MP[5:0], PosX[6:0], PosY[5:0], hw[3:0], hh[2:0]}
+    // Pack entity
     function [45:0] pack_entity;
         input [1:0]  etype;
         input [5:0]  hp;
@@ -81,7 +85,6 @@ module game_state(
         end
     endfunction
 
-    // Extract fields from entity
     function [1:0] ent_type;   input [45:0] e; ent_type   = e[45:44]; endfunction
     function [5:0] ent_hp;     input [45:0] e; ent_hp     = e[43:38]; endfunction
     function [5:0] ent_def;    input [45:0] e; ent_def    = e[37:32]; endfunction
@@ -92,8 +95,6 @@ module game_state(
     function [3:0] ent_hw;     input [45:0] e; ent_hw     = e[6:3];   endfunction
     function [2:0] ent_hh;     input [45:0] e; ent_hh     = e[2:0];   endfunction
 
-    // Write a single field back
-    // For HP: bits [43:38]
     function [45:0] set_hp;
         input [45:0] e;
         input [5:0]  new_hp;
@@ -111,18 +112,10 @@ module game_state(
         end
     endfunction
 
-    // Expose player position for top-level
     assign player_x = ent_px(player_entity);
     assign player_y = ent_py(player_entity);
 
-    // HP scaling: player real_hp = entity_hp * 4 (max 63*4=252 >= 200)
-    //             minion real_hp = entity_hp * 1 (max 63 >= 50)
-    //             boss   real_hp = entity_hp * 8 (max 63*8=504 >= 400)
-    localparam [3:0] HP_SCALE_PLAYER = 4'd4;
-    localparam [3:0] HP_SCALE_MINION = 4'd1;
-    localparam [3:0] HP_SCALE_BOSS   = 4'd8;
-
-    // Internal real HP tracking (full precision)
+    // Internal real HP tracking
     reg [8:0] real_hp_player;
     reg [8:0] real_hp_enemy [0:2];
 
@@ -131,7 +124,7 @@ module game_state(
     reg signed [15:0] proj_vx, proj_vy;
     localparam signed [15:0] GRAVITY = 16'sd10;
 
-    // 30 Hz tick from 100 MHz
+    // 30 Hz tick
     reg [21:0] tick_cnt;
     wire tick_30hz = (tick_cnt == 22'd3_333_333);
     always @(posedge clk or posedge rst) begin
@@ -160,6 +153,7 @@ module game_state(
     // Skill data
     reg [5:0]  skill_damage;
     reg [3:0]  skill_blast;
+    reg [3:0]  skill_energy_cost;
 
     // Animation tick counter
     reg [9:0]  anim_ticks;
@@ -185,7 +179,10 @@ module game_state(
     // LUT ready flag
     reg        lut_ready;
 
-    // Keep player_hp output synced with real_hp_player
+    // Movement: move_pending for terrain lookup
+    reg [1:0]  move_step;
+    reg [6:0]  move_target_x;
+
     always @(*) begin
         player_hp = real_hp_player;
     end
@@ -193,16 +190,27 @@ module game_state(
     // ---- Skill decoder ----
     always @(*) begin
         case (skill_sel)
-            4'd0: begin skill_damage = 6'd25; skill_blast = 4'd3; end // Normal
-            4'd1: begin skill_damage = 6'd15; skill_blast = 4'd2; end // Scatter
-            4'd2: begin skill_damage = 6'd40; skill_blast = 4'd2; end // Snipe
-            4'd3: begin skill_damage = 6'd35; skill_blast = 4'd5; end // Firepot
-            4'd4: begin skill_damage = 6'd60; skill_blast = 4'd7; end // Nuke
-            default: begin skill_damage = 6'd25; skill_blast = 4'd3; end
+            4'd0:  begin skill_damage = 6'd15; skill_blast = 4'd2; skill_energy_cost = 4'd0;  end
+            4'd1:  begin skill_damage = 6'd18; skill_blast = 4'd2; skill_energy_cost = 4'd1;  end
+            4'd2:  begin skill_damage = 6'd22; skill_blast = 4'd3; skill_energy_cost = 4'd2;  end
+            4'd3:  begin skill_damage = 6'd25; skill_blast = 4'd3; skill_energy_cost = 4'd3;  end
+            4'd4:  begin skill_damage = 6'd28; skill_blast = 4'd3; skill_energy_cost = 4'd4;  end
+            4'd5:  begin skill_damage = 6'd30; skill_blast = 4'd4; skill_energy_cost = 4'd5;  end
+            4'd6:  begin skill_damage = 6'd33; skill_blast = 4'd4; skill_energy_cost = 4'd6;  end
+            4'd7:  begin skill_damage = 6'd36; skill_blast = 4'd4; skill_energy_cost = 4'd7;  end
+            4'd8:  begin skill_damage = 6'd39; skill_blast = 4'd5; skill_energy_cost = 4'd8;  end
+            4'd9:  begin skill_damage = 6'd42; skill_blast = 4'd5; skill_energy_cost = 4'd9;  end
+            4'd10: begin skill_damage = 6'd45; skill_blast = 4'd5; skill_energy_cost = 4'd10; end
+            4'd11: begin skill_damage = 6'd48; skill_blast = 4'd6; skill_energy_cost = 4'd11; end
+            4'd12: begin skill_damage = 6'd51; skill_blast = 4'd6; skill_energy_cost = 4'd12; end
+            4'd13: begin skill_damage = 6'd54; skill_blast = 4'd7; skill_energy_cost = 4'd13; end
+            4'd14: begin skill_damage = 6'd57; skill_blast = 4'd7; skill_energy_cost = 4'd14; end
+            4'd15: begin skill_damage = 6'd63; skill_blast = 4'd8; skill_energy_cost = 4'd15; end
+            default: begin skill_damage = 6'd15; skill_blast = 4'd2; skill_energy_cost = 4'd0; end
         endcase
     end
 
-    // Manhattan distance function
+    // Manhattan distance
     function [7:0] manhattan;
         input [6:0] x1;
         input [5:0] y1;
@@ -217,7 +225,7 @@ module game_state(
         end
     endfunction
 
-    // Terrain height computation for init
+    // Terrain height for init
     reg [5:0] computed_terrain;
     always @(*) begin
         if (!current_round) begin
@@ -237,70 +245,63 @@ module game_state(
         end
     end
 
-    // Helper: get entity for current enemy index
-    function [45:0] get_enemy_entity;
-        input [1:0] idx;
-        begin
-            case (idx)
-                2'd0: get_enemy_entity = enemy_entity_0;
-                2'd1: get_enemy_entity = enemy_entity_1;
-                2'd2: get_enemy_entity = enemy_entity_2;
-                default: get_enemy_entity = 46'd0;
-            endcase
-        end
-    endfunction
-
     // ====== MAIN FSM ======
     always @(posedge clk or posedge rst) begin
         if (rst) begin
-            game_phase      <= PH_INIT;
-            real_hp_player  <= 9'd200;
-            player_angle    <= 7'd45;
-            player_power    <= 4'd8;
-            player_energy   <= 4'd12;
-            current_round   <= 0;
-            enemy_alive     <= 3'b111;
-            proj_active     <= 0;
-            proj_x          <= 0;
-            proj_y          <= 0;
-            proj_fx         <= 0;
-            proj_fy         <= 0;
-            proj_vx         <= 0;
-            proj_vy         <= 0;
-            victory         <= 0;
-            defeat          <= 0;
-            is_player_turn  <= 1;
+            game_phase        <= PH_INIT;
+            real_hp_player    <= 9'd200;
+            player_angle      <= 7'd45;
+            player_power      <= 4'd8;
+            player_energy     <= 4'd12;
+            player_fuel       <= 4'd10;
+            current_round     <= 0;
+            enemy_alive       <= 3'b111;
+            proj_active       <= 0;
+            proj_x            <= 0;
+            proj_y            <= 0;
+            proj_fx           <= 0;
+            proj_fy           <= 0;
+            proj_vx           <= 0;
+            proj_vy           <= 0;
+            victory           <= 0;
+            defeat            <= 0;
+            is_player_turn    <= 1;
             current_enemy_idx <= 0;
-            terrain_wr_en   <= 0;
-            init_col        <= 0;
-            init_step       <= 0;
-            anim_ticks      <= 0;
-            ai_delay        <= 0;
-            resolve_step    <= 0;
-            blast_dx        <= 0;
-            fire_dir_right  <= 1;
-            lut_angle       <= 0;
-            lut_ready       <= 0;
-            ai_angle        <= 7'd45;
-            ai_power        <= 4'd7;
+            terrain_wr_en     <= 0;
+            init_col          <= 0;
+            init_step         <= 0;
+            anim_ticks        <= 0;
+            ai_delay          <= 0;
+            resolve_step      <= 0;
+            blast_dx          <= 0;
+            fire_dir_right    <= 1;
+            lut_angle         <= 0;
+            lut_ready         <= 0;
+            ai_angle          <= 7'd45;
+            ai_power          <= 4'd7;
+            hit_event         <= 0;
+            hit_damage        <= 0;
+            move_step         <= 0;
+            move_target_x     <= 0;
 
-            // Player entity: TYPE=00, HP=50(x4=200), DEF=5, ATK=25, MP=12, X=10, Y=0, hw=2, hh=1
-            player_entity  <= pack_entity(TYPE_PLAYER, 6'd50, 6'd5, 6'd25, 6'd12, 7'd10, 6'd0, 4'd2, 3'd1);
-
-            // Round 1 enemies: minions at x=55,70,85 - HP=50(x1=50), DEF=2, ATK=15, MP=0, hw=1, hh=1
-            enemy_entity_0 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd55, 6'd0, 4'd1, 3'd1);
-            enemy_entity_1 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd70, 6'd0, 4'd1, 3'd1);
-            enemy_entity_2 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd85, 6'd0, 4'd1, 3'd1);
+            player_entity  <= pack_entity(TYPE_PLAYER, 6'd50, 6'd5, 6'd25, 6'd12, 7'd10, 6'd0, 4'd4, 3'd4);
+            enemy_entity_0 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd55, 6'd0, 4'd3, 3'd4);
+            enemy_entity_1 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd70, 6'd0, 4'd3, 3'd4);
+            enemy_entity_2 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd85, 6'd0, 4'd3, 3'd4);
 
             real_hp_enemy[0] <= 9'd50;
             real_hp_enemy[1] <= 9'd50;
             real_hp_enemy[2] <= 9'd50;
         end else begin
             terrain_wr_en <= 0;
+            
+            // Clear hit_event after it's been set (pulse)
+            if (hit_event && tick_30hz)
+                hit_event <= 0;
 
             case (game_phase)
 
-            // ===== INIT: Write terrain to RAM =====
+            // ===== INIT =====
             PH_INIT: begin
                 case (init_step)
                 3'd0: begin
@@ -323,10 +324,9 @@ module game_state(
                     init_step <= 3'd3;
                 end
                 3'd3: begin
-                    // Place player on terrain
                     player_entity <= set_pos(player_entity,
                         ent_px(player_entity),
-                        (terrain_rd_data_a >= 6'd4) ? terrain_rd_data_a - 6'd3 : 6'd1);
+                        (terrain_rd_data_a >= 6'd8) ? terrain_rd_data_a - 6'd7 : 6'd1);
                     terrain_rd_addr_a <= ent_px(enemy_entity_0);
                     init_step <= 3'd4;
                 end
@@ -334,11 +334,11 @@ module game_state(
                     if (current_round)
                         enemy_entity_0 <= set_pos(enemy_entity_0,
                             ent_px(enemy_entity_0),
-                            (terrain_rd_data_a >= 6'd6) ? terrain_rd_data_a - 6'd5 : 6'd1);
+                            (terrain_rd_data_a >= 6'd10) ? terrain_rd_data_a - 6'd9 : 6'd1);
                     else
                         enemy_entity_0 <= set_pos(enemy_entity_0,
                             ent_px(enemy_entity_0),
-                            (terrain_rd_data_a >= 6'd4) ? terrain_rd_data_a - 6'd3 : 6'd1);
+                            (terrain_rd_data_a >= 6'd8) ? terrain_rd_data_a - 6'd7 : 6'd1);
                     if (!current_round) begin
                         terrain_rd_addr_a <= ent_px(enemy_entity_1);
                         init_step <= 3'd5;
@@ -349,25 +349,76 @@ module game_state(
                 3'd5: begin
                     enemy_entity_1 <= set_pos(enemy_entity_1,
                         ent_px(enemy_entity_1),
-                        (terrain_rd_data_a >= 6'd4) ? terrain_rd_data_a - 6'd3 : 6'd1);
+                        (terrain_rd_data_a >= 6'd8) ? terrain_rd_data_a - 6'd7 : 6'd1);
                     terrain_rd_addr_a <= ent_px(enemy_entity_2);
                     init_step <= 3'd6;
                 end
                 3'd6: begin
                     enemy_entity_2 <= set_pos(enemy_entity_2,
                         ent_px(enemy_entity_2),
-                        (terrain_rd_data_a >= 6'd4) ? terrain_rd_data_a - 6'd3 : 6'd1);
+                        (terrain_rd_data_a >= 6'd8) ? terrain_rd_data_a - 6'd7 : 6'd1);
                     init_step <= 3'd7;
                 end
                 3'd7: begin
-                    game_phase      <= PH_AIM;
-                    is_player_turn  <= 1;
+                    // Start with MOVE phase for player turn
+                    game_phase        <= PH_MOVE;
+                    is_player_turn    <= 1;
                     current_enemy_idx <= 0;
-                    init_step       <= 0;
-                    init_col        <= 0;
+                    player_fuel       <= 4'd10;
+                    init_step         <= 0;
+                    init_col          <= 0;
+                    move_step         <= 0;
                 end
                 default: init_step <= 3'd0;
                 endcase
+            end
+
+            // ===== MOVE PHASE (NEW) =====
+            // Player can move left/right, 1 pixel per press, up to 10 total (fuel)
+            // LEDs show fuel. When fuel=0 or btnC pressed, go to AIM.
+            PH_MOVE: begin
+                if (is_player_turn) begin
+                    case (move_step)
+                    2'd0: begin
+                        // Wait for input
+                        if (confirm_aim || player_fuel == 4'd0) begin
+                            // Transition to AIM
+                            game_phase <= PH_AIM;
+                            move_step  <= 0;
+                        end else if (move_left && player_fuel > 0) begin
+                            // Try move left
+                            if (ent_px(player_entity) > 7'd1) begin
+                                move_target_x <= ent_px(player_entity) - 7'd1;
+                                terrain_rd_addr_a <= ent_px(player_entity) - 7'd1;
+                                move_step <= 2'd1;
+                            end
+                        end else if (move_right && player_fuel > 0) begin
+                            // Try move right
+                            if (ent_px(player_entity) < 7'd94) begin
+                                move_target_x <= ent_px(player_entity) + 7'd1;
+                                terrain_rd_addr_a <= ent_px(player_entity) + 7'd1;
+                                move_step <= 2'd1;
+                            end
+                        end
+                    end
+                    2'd1: begin
+                        // Wait for terrain read
+                        move_step <= 2'd2;
+                    end
+                    2'd2: begin
+                        // Place player on new terrain
+                        player_entity <= set_pos(player_entity,
+                            move_target_x,
+                            (terrain_rd_data_a >= 6'd8) ? terrain_rd_data_a - 6'd7 : 6'd1);
+                        player_fuel <= player_fuel - 1;
+                        move_step <= 2'd0;
+                    end
+                    default: move_step <= 2'd0;
+                    endcase
+                end else begin
+                    // Enemy doesn't move, skip to aim
+                    game_phase <= PH_AIM;
+                end
             end
 
             // ===== AIM =====
@@ -378,10 +429,14 @@ module game_state(
                     if (power_up   && player_power < 4'd15) player_power <= player_power + 1;
                     if (power_down && player_power > 4'd1)  player_power <= player_power - 1;
                     if (fire_btn) begin
-                        fire_dir_right <= 1;
-                        lut_angle      <= player_angle;
-                        game_phase     <= PH_FIRE;
-                        lut_ready      <= 0;
+                        // Check energy
+                        if (player_energy >= skill_energy_cost) begin
+                            player_energy <= player_energy - skill_energy_cost;
+                            fire_dir_right <= 1;
+                            lut_angle      <= player_angle;
+                            game_phase     <= PH_FIRE;
+                            lut_ready      <= 0;
+                        end
                     end
                 end else begin
                     if (ai_delay < 6'd30) begin
@@ -497,51 +552,69 @@ module game_state(
                 case (resolve_step)
                 3'd0: begin
                     if (is_player_turn) begin
-                        // Player -> enemies: use ATK from player entity for base, but skill_damage overrides
                         if (enemy_alive[0] && manhattan(proj_x, proj_y, ent_px(enemy_entity_0), ent_py(enemy_entity_0)) <= {4'd0, skill_blast}) begin
-                            if (real_hp_enemy[0] <= {3'd0, skill_damage})
+                            if (real_hp_enemy[0] <= {3'd0, skill_damage}) begin
                                 real_hp_enemy[0] <= 9'd0;
-                            else
+                                hit_event <= 1;
+                                hit_damage <= {2'd0, real_hp_enemy[0][5:0]};
+                            end else begin
                                 real_hp_enemy[0] <= real_hp_enemy[0] - {3'd0, skill_damage};
+                                hit_event <= 1;
+                                hit_damage <= {2'd0, skill_damage};
+                            end
                         end
                         if (enemy_alive[1] && manhattan(proj_x, proj_y, ent_px(enemy_entity_1), ent_py(enemy_entity_1)) <= {4'd0, skill_blast}) begin
-                            if (real_hp_enemy[1] <= {3'd0, skill_damage})
+                            if (real_hp_enemy[1] <= {3'd0, skill_damage}) begin
                                 real_hp_enemy[1] <= 9'd0;
-                            else
+                                hit_event <= 1;
+                                hit_damage <= {2'd0, real_hp_enemy[1][5:0]};
+                            end else begin
                                 real_hp_enemy[1] <= real_hp_enemy[1] - {3'd0, skill_damage};
+                                hit_event <= 1;
+                                hit_damage <= {2'd0, skill_damage};
+                            end
                         end
                         if (enemy_alive[2] && manhattan(proj_x, proj_y, ent_px(enemy_entity_2), ent_py(enemy_entity_2)) <= {4'd0, skill_blast}) begin
-                            if (real_hp_enemy[2] <= {3'd0, skill_damage})
+                            if (real_hp_enemy[2] <= {3'd0, skill_damage}) begin
                                 real_hp_enemy[2] <= 9'd0;
-                            else
+                                hit_event <= 1;
+                                hit_damage <= {2'd0, real_hp_enemy[2][5:0]};
+                            end else begin
                                 real_hp_enemy[2] <= real_hp_enemy[2] - {3'd0, skill_damage};
+                                hit_event <= 1;
+                                hit_damage <= {2'd0, skill_damage};
+                            end
                         end
                     end else begin
-                        // Enemy -> player: damage based on entity ATK field
                         if (manhattan(proj_x, proj_y, ent_px(player_entity), ent_py(player_entity)) <= 8'd5) begin
                             if (!current_round) begin
-                                // Minion ATK: 15 damage
-                                if (real_hp_player <= 9'd15)
+                                if (real_hp_player <= 9'd15) begin
+                                    hit_event <= 1;
+                                    hit_damage <= real_hp_player[7:0];
                                     real_hp_player <= 9'd0;
-                                else
+                                end else begin
                                     real_hp_player <= real_hp_player - 9'd15;
+                                    hit_event <= 1;
+                                    hit_damage <= 8'd15;
+                                end
                             end else begin
-                                // Boss ATK: 30 damage
-                                if (real_hp_player <= 9'd30)
+                                if (real_hp_player <= 9'd30) begin
+                                    hit_event <= 1;
+                                    hit_damage <= real_hp_player[7:0];
                                     real_hp_player <= 9'd0;
-                                else
+                                end else begin
                                     real_hp_player <= real_hp_player - 9'd30;
+                                    hit_event <= 1;
+                                    hit_damage <= 8'd30;
+                                end
                             end
                         end
                     end
 
-                    // Update alive flags
                     if (real_hp_enemy[0] == 9'd0) enemy_alive[0] <= 1'b0;
                     if (real_hp_enemy[1] == 9'd0) enemy_alive[1] <= 1'b0;
                     if (real_hp_enemy[2] == 9'd0) enemy_alive[2] <= 1'b0;
 
-                    // Sync entity HP fields (scaled down for entity format)
-                    // Player: real_hp/4, clamped to 6 bits
                     player_entity <= set_hp(player_entity,
                         (real_hp_player[8:2] > 6'd63) ? 6'd63 : real_hp_player[8:2]);
                     enemy_entity_0 <= set_hp(enemy_entity_0,
@@ -585,10 +658,8 @@ module game_state(
                         if (!current_round) begin
                             current_round   <= 1;
                             player_energy   <= 4'd12;
-                            // Update player entity MP
                             player_entity[25:20] <= 6'd12;
-                            // Boss: TYPE=10, HP=50(x8=400), DEF=8, ATK=30, MP=0, X=80, Y=0, hw=3, hh=2
-                            enemy_entity_0 <= pack_entity(TYPE_BOSS, 6'd50, 6'd8, 6'd30, 6'd0, 7'd80, 6'd0, 4'd3, 3'd2);
+                            enemy_entity_0 <= pack_entity(TYPE_BOSS, 6'd50, 6'd8, 6'd30, 6'd0, 7'd80, 6'd0, 4'd5, 3'd5);
                             enemy_entity_1 <= 46'd0;
                             enemy_entity_2 <= 46'd0;
                             real_hp_enemy[0] <= 9'd400;
@@ -623,23 +694,25 @@ module game_state(
                     end else begin
                         current_enemy_idx <= 2'd0;
                     end
-                    game_phase <= PH_AIM;
+                    game_phase <= PH_MOVE;  // Enemy goes through MOVE (which skips for AI)
                 end else begin
                     if (!current_round) begin
                         if (current_enemy_idx == 2'd0 && (enemy_alive[1] || enemy_alive[2])) begin
                             if (enemy_alive[1])  current_enemy_idx <= 2'd1;
                             else                 current_enemy_idx <= 2'd2;
-                            game_phase <= PH_AIM;
+                            game_phase <= PH_MOVE;
                         end else if (current_enemy_idx == 2'd1 && enemy_alive[2]) begin
                             current_enemy_idx <= 2'd2;
-                            game_phase <= PH_AIM;
+                            game_phase <= PH_MOVE;
                         end else begin
                             is_player_turn <= 1;
-                            game_phase <= PH_AIM;
+                            player_fuel    <= 4'd10;  // Reset fuel for player
+                            game_phase     <= PH_MOVE;
                         end
                     end else begin
                         is_player_turn <= 1;
-                        game_phase <= PH_AIM;
+                        player_fuel    <= 4'd10;
+                        game_phase     <= PH_MOVE;
                     end
                 end
             end
