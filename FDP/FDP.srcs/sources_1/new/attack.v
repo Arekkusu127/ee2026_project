@@ -15,10 +15,12 @@ module attack(
     input clk,
     input signed [7:0] offset_num,
     input [2:0] projectile_type,
+    input [5:0] dmg,
     input [45:0] data [4:0],
     input [5:0] terrain [0:95],
     output [7:0] projectile_y [0:95],
-    output [7:0] impact_x, impact_y
+    output [7:0] impact_x, impact_y,
+    output [7:0] impact2_x, impact2_y,
     output reg hit_flag,
     output reg [1:0] hit_enemy_index,
     output reg [7:0] hit_x, hit_y
@@ -100,6 +102,31 @@ module attack(
                 end
                 for (i = x; i < 96; i = i + 1) begin
                     dy = dy - g;
+                    y_calc = $signed({5'b0, projectile_y[i-1]}) + dy; // new y based on previous y and current dy
+                    if (y_calc >= 65 || y_calc < 0) begin
+                        projectile_y[i] = 8'd65;
+                    end
+                    else begin
+                        projectile_y[i] = y_calc[7:0];
+                    end
+                    if (!impact_detected && projectile_y[i] <= terrain[i]) begin
+                        impact_detected = 1;
+                        impact_x = i[7:0];
+                        impact_y = projectile_y[i];
+                    end
+                    else if (projectile_y[i] <= terrain[i]) begin
+                        impact2_x = i[7:0];
+                        impact2_y = projectile_y[i];
+                    end
+                end
+            end
+
+            2: begin // Bounce projectile
+                for (i = 0; i < 96; i = i + 1) begin
+                    projectile_y[i] = 8'd65;
+                end
+                for (i = x; i < 96; i = i + 1) begin
+                    dy = dy - g;
                     y_calc = $signed({5'b0, projectile_y[i-1]}) + dy;
                     if (y_calc >= 65 || y_calc < 0) begin
                         projectile_y[i] = 8'd65;
@@ -112,6 +139,7 @@ module attack(
                         impact_detected = 1;
                         impact_x = i[7:0];
                         impact_y = projectile_y[i];
+                        dy = -dy / 2; // Reverse and reduce speed for bounce
                     end
                 end
             end
@@ -131,6 +159,9 @@ module attack(
                     projectile_y[j] <= ey + hh) begin
                         hit_flag = 1;
                         hit_enemy_index = e[1:0];
+
+                        enemy[e][15:8] = enemy_y[7:2] - dmg; // Reduce enemy HP by dmg
+
                         hit_x = j[7:0];
                         hit_y = projectile_y[j];
                     end
