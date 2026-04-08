@@ -4,11 +4,23 @@ Description: Attack module for projectile motion and hit detection
 WHW
 */
 
-
 /*
 00    000000  0000  000000  0000  00000000  00000000  0000  0000     
 TYPE  HP      DEF   ATK     MP    PosX      PosY      Xvar  Yvar  
 0             8         16          24        32        40     
+*/
+
+/*
+Entity data format (46 bits):
+[45:44] TYPE
+[43:38] HP
+[37:32] DEF
+[31:26] ATK
+[25:20] MP
+[23:16] PosX
+[15:8]  PosY
+[7:4]   half_width
+[3:0]   half_height
 */
 
 module attack(
@@ -16,132 +28,159 @@ module attack(
     input signed [7:0] offset_num,
     input [2:0] projectile_type,
     input [5:0] dmg,
-    input [45:0] data [4:0],
+    input [45:0] player_data,
+    input [45:0] enemy_data [0:3],
     input [5:0] terrain [0:95],
-    output [7:0] projectile_y [0:95],
-    output [7:0] impact_x, impact_y,
-    output [7:0] impact2_x, impact2_y,
+
+    output reg [7:0] projectile_y [0:95],
+    output reg [7:0] impact_x,
+    output reg [7:0] impact_y,
+    output reg [7:0] impact2_x,
+    output reg [7:0] impact2_y,
     output reg hit_flag,
     output reg [1:0] hit_enemy_index,
-    output reg [7:0] hit_x, hit_y
-    );
-    integer i = 0;
+    output reg [7:0] hit_x,
+    output reg [7:0] hit_y,
+    output reg [5:0] damage_to_enemy [0:3]
+);
+
     parameter g = 1;
 
-    wire [7:0] x = data[0][23:16];
-    wire [7:0] y = data[0][15: 8];
+    // Player position
+    wire [7:0] x0 = player_data[23:16];
+    wire [7:0] y0 = player_data[15:8];
 
+    // Enemy data unpacking
+    wire [7:0] enemy_x [0:3];
+    wire [7:0] enemy_y [0:3];
+    wire [3:0] enemy_hw [0:3];
+    wire [3:0] enemy_hh [0:3];
+
+    genvar gi;
+    generate
+        for (gi = 0; gi < 4; gi = gi + 1) begin : enemy_unpack
+            assign enemy_x[gi]  = enemy_data[gi][23:16];
+            assign enemy_y[gi]  = enemy_data[gi][15:8];
+            assign enemy_hw[gi] = enemy_data[gi][7:4];
+            assign enemy_hh[gi] = enemy_data[gi][3:0];
+        end
+    endgenerate
+
+    // Internal calculation variables
+    integer i, e, j;
     reg signed [13:0] numerator;
     reg signed [13:0] y_calc;
     reg signed [13:0] dy;
-
-    reg impact_detected = 0;
-
-    // Unpack Enemy positions
-    wire [7:0] enemy_x  [0:3];
-    wire [7:0] enemy_y  [0:3];
-    wire [3:0] enemy_hw [0:3];  // x half-width
-    wire [3:0] enemy_hh [0:3];  // y half-height
-
-    assign enemy_x[0]  = enemy_0[23:16];
-    assign enemy_y[0]  = enemy_0[15:8];
-    assign enemy_hw[0] = enemy_0[7:4];
-    assign enemy_hh[0] = enemy_0[3:0];
-
-    assign enemy_x[1]  = enemy_1[23:16];
-    assign enemy_y[1]  = enemy_1[15:8];
-    assign enemy_hw[1] = enemy_1[7:4];
-    assign enemy_hh[1] = enemy_1[3:0];
-
-    assign enemy_x[2]  = enemy_2[23:16];
-    assign enemy_y[2]  = enemy_2[15:8];
-    assign enemy_hw[2] = enemy_2[7:4];
-    assign enemy_hh[2] = enemy_2[3:0];
-
-    assign enemy_x[3]  = enemy_3[23:16];
-    assign enemy_y[3]  = enemy_3[15:8];
-    assign enemy_hw[3] = enemy_3[7:4];
-    assign enemy_hh[3] = enemy_3[3:0];
-
-    integer e, j;
+    reg impact_detected;
     reg [7:0] ex, ey;
     reg [3:0] hw, hh;
+    reg trajectory_started;
 
-
-    always @(posedge clk) begin
-        dy = $signed(offset_num);
-        impact_detected = 0;
+    always @(*) begin
+        // Reset all outputs
+        hit_flag = 0;
+        hit_enemy_index = 0;
+        hit_x = 0;
+        hit_y = 0;
         impact_x = 0;
         impact_y = 0;
+        impact2_x = 0;
+        impact2_y = 0;
+        impact_detected = 0;
+        trajectory_started = 0;
+
+        for (i = 0; i < 4; i = i + 1)
+            damage_to_enemy[i] = 0;
+
+        // Initialize all projectile_y to offscreen
+        for (i = 0; i < 96; i = i + 1)
+            projectile_y[i] = 8'd65;
+
+        dy = $signed(offset_num);
+
         case (projectile_type)
-            0: begin // Straight line projectile
+            3'd0: begin
+                // Straight line projectile (linear interpolation)
                 for (i = 0; i < 96; i = i + 1) begin
-                    projectile_y[i] = 8'd65;  // Initialize all projectile_y to 65
-                end
-                for (i = x; i < 96; i = i + 1) begin
-                    numerator = offset_num * (i - x0);
-                    y_calc = y0 + (numerator / 50);
-                    if (y_calc >= 65 || y_calc < 0) begin
-                        projectile_y[i] = 8'd65;
-                    end
-                    else begin
-                        projectile_y[i] = y_calc[7:0];
-                    end
+                    if (i >= x0 && i < 96) begin
+                        // Approximate /50 with (x * 5) >> 8  (≈ /51.2, ~2.4% error)
+                        numerator = $signed(offset_num) * $signed({1'b0, i[7:0]} - {1'b0, x0});
+                        y_calc = $signed({6'b0, y0}) + ((numerator * 5) >>> 8);
 
-                    if (!impact_detected && projectile_y[i] <= terrain[i]) begin
-                        impact_detected = 1;
-                        impact_x = i[7:0];
-                        impact_y = projectile_y[i];
+                        if (y_calc >= 65 || y_calc < 0)
+                            projectile_y[i] = 8'd65;
+                        else
+                            projectile_y[i] = y_calc[7:0];
+
+                        if (!impact_detected && projectile_y[i] != 8'd65 &&
+                            projectile_y[i] >= terrain[i]) begin
+                            impact_detected = 1;
+                            impact_x = i[7:0];
+                            impact_y = projectile_y[i];
+                        end
                     end
                 end
             end
 
-            1: begin // Parabolic projectile
+            3'd1: begin
+                // Parabolic projectile
                 for (i = 0; i < 96; i = i + 1) begin
-                    projectile_y[i] = 8'd65;
-                end
-                for (i = x; i < 96; i = i + 1) begin
-                    dy = dy - g;
-                    y_calc = $signed({5'b0, projectile_y[i-1]}) + dy; // new y based on previous y and current dy
-                    if (y_calc >= 65 || y_calc < 0) begin
-                        projectile_y[i] = 8'd65;
-                    end
-                    else begin
-                        projectile_y[i] = y_calc[7:0];
-                    end
-                    if (!impact_detected && projectile_y[i] <= terrain[i]) begin
-                        impact_detected = 1;
-                        impact_x = i[7:0];
-                        impact_y = projectile_y[i];
-                    end
-                    else if (projectile_y[i] <= terrain[i]) begin
-                        impact2_x = i[7:0];
-                        impact2_y = projectile_y[i];
+                    if (i == x0) begin
+                        // Launch point
+                        projectile_y[i] = y0;
+                        trajectory_started = 1;
+                    end else if (i > x0 && trajectory_started) begin
+                        dy = dy - g;
+                        y_calc = $signed({6'b0, projectile_y[i-1]}) + dy;
+
+                        if (y_calc >= 65 || y_calc < 0)
+                            projectile_y[i] = 8'd65;
+                        else
+                            projectile_y[i] = y_calc[7:0];
+
+                        if (!impact_detected && projectile_y[i] != 8'd65 &&
+                            projectile_y[i] >= terrain[i]) begin
+                            impact_detected = 1;
+                            impact_x = i[7:0];
+                            impact_y = projectile_y[i];
+                        end else if (impact_detected && projectile_y[i] != 8'd65 &&
+                                    projectile_y[i] >= terrain[i]) begin
+                            impact2_x = i[7:0];
+                            impact2_y = projectile_y[i];
+                        end
                     end
                 end
             end
 
-            2: begin // Bounce projectile
+            3'd2: begin
+                // Bounce projectile
                 for (i = 0; i < 96; i = i + 1) begin
-                    projectile_y[i] = 8'd65;
-                end
-                for (i = x; i < 96; i = i + 1) begin
-                    dy = dy - g;
-                    y_calc = $signed({5'b0, projectile_y[i-1]}) + dy;
-                    if (y_calc >= 65 || y_calc < 0) begin
-                        projectile_y[i] = 8'd65;
-                    end
-                    else begin
-                        projectile_y[i] = y_calc[7:0];
-                    end
+                    if (i == x0) begin
+                        projectile_y[i] = y0;
+                        trajectory_started = 1;
+                    end else if (i > x0 && trajectory_started) begin
+                        dy = dy - g;
+                        y_calc = $signed({6'b0, projectile_y[i-1]}) + dy;
 
-                    if (!impact_detected && projectile_y[i] <= terrain[i]) begin
-                        impact_detected = 1;
-                        impact_x = i[7:0];
-                        impact_y = projectile_y[i];
-                        dy = -dy / 2; // Reverse and reduce speed for bounce
+                        if (y_calc >= 65 || y_calc < 0)
+                            projectile_y[i] = 8'd65;
+                        else
+                            projectile_y[i] = y_calc[7:0];
+
+                        if (!impact_detected && projectile_y[i] != 8'd65 &&
+                            projectile_y[i] >= terrain[i]) begin
+                            impact_detected = 1;
+                            impact_x = i[7:0];
+                            impact_y = projectile_y[i];
+                            // Bounce: reverse and halve vertical velocity
+                            dy = -(dy >>> 1);
+                        end
                     end
                 end
+            end
+
+            default: begin
+                // No trajectory
             end
         endcase
 
@@ -152,16 +191,15 @@ module attack(
             hw = enemy_hw[e];
             hh = enemy_hh[e];
 
-            for (j = ex - hw; j <= ex + hw; j = j + 1) begin
-                if (j >= 0 && j < 96) begin
-                    if (!hit_flag &&
-                    projectile_y[j] >= ey - hh &&
-                    projectile_y[j] <= ey + hh) begin
+            for (j = 0; j < 96; j = j + 1) begin
+                if (j >= (ex - hw) && j <= (ex + hw) &&
+                    projectile_y[j] != 8'd65 &&
+                    projectile_y[j] >= (ey - hh) &&
+                    projectile_y[j] <= (ey + hh)) begin
+                    if (!hit_flag) begin
                         hit_flag = 1;
                         hit_enemy_index = e[1:0];
-
-                        enemy[e][15:8] = enemy_y[7:2] - dmg; // Reduce enemy HP by dmg
-
+                        damage_to_enemy[e] = dmg;
                         hit_x = j[7:0];
                         hit_y = projectile_y[j];
                     end
@@ -169,6 +207,4 @@ module attack(
             end
         end
     end
-
-
 endmodule

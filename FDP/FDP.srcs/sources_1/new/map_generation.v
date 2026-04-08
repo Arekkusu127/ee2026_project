@@ -19,69 +19,84 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
-
-module map_generation(
+module map_generation #(
+    parameter X_RANGE = 95,
+    parameter Y_RANGE = 63,
+    parameter MAX_ELEVATION = 6,
+    parameter TOP_MARGIN = 20,
+    parameter BOTTOM_MARGIN = 5,
+    parameter EDGE_FLAT = 10
+)(
     input clk,
     input rst,
-    input [6:0] x_range = 7'd95,
-    input [5:0] y_range = 6'd63,
-    input [3:0] max_elevation = 4'd6,
-    input [4:0] top_margin = 5'd20,
-    input [2:0] bottom_margin = 3'd5,
-    input [3:0] edge_flat = 4'd10,
     output reg [5:0] terrain [0:95]
 );
 
-    // Generate only the left half, then mirror to enforce horizontal symmetry.
     reg [5:0] prev_y;
-    integer i = 0;
+    reg [6:0] i;
+    reg done;
+
+    // LFSR for pseudo-random number generation
+    reg [15:0] lfsr;
+
     integer current_y;
     integer left_idx;
     integer right_idx;
-    integer x_last;
     integer low_limit;
     integer high_limit;
     integer edge_y;
+    integer half;
+    integer rand_offset;
 
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             i <= 0;
-            edge_y = y_range - bottom_margin;
-            if (edge_y < top_margin) edge_y = top_margin;
-            prev_y <= edge_y;
-        end else begin 
-            x_last = x_range;
-            if (x_last > 95) x_last = 95;
+            done <= 0;
+            lfsr <= 16'hACE1;
 
-            if (i < ((x_last + 2) >> 1)) begin
+            low_limit = TOP_MARGIN;
+            high_limit = Y_RANGE - BOTTOM_MARGIN;
+            if (high_limit < low_limit) high_limit = low_limit;
+
+            prev_y <= high_limit[5:0];
+        end else if (!done) begin
+            // Advance LFSR every cycle (taps: 16,14,13,11)
+            lfsr <= {lfsr[14:0], lfsr[15] ^ lfsr[13] ^ lfsr[12] ^ lfsr[10]};
+
+            low_limit = TOP_MARGIN;
+            high_limit = Y_RANGE - BOTTOM_MARGIN;
+            if (high_limit < low_limit) high_limit = low_limit;
+            edge_y = high_limit;
+
+            half = (X_RANGE + 2) >> 1;
+
+            if (i < half) begin
                 left_idx = i;
-                right_idx = x_last - i;
+                right_idx = X_RANGE - i;
 
-                low_limit = top_margin;
-                high_limit = y_range - bottom_margin;
-                if (high_limit < low_limit) high_limit = low_limit;
-
-                edge_y = high_limit;
-
-                // Keep flat land near both edges for easy spawn/landing.
-                if (left_idx < edge_flat) begin
+                if (left_idx < EDGE_FLAT) begin
                     current_y = edge_y;
                 end else begin
-                    // Random walk with bounded slope changes.
-                    current_y = prev_y + ($random % (2 * max_elevation + 1)) - max_elevation;
+                    // Use LFSR bits for random walk: range [-MAX_ELEVATION, +MAX_ELEVATION]
+                    // lfsr[3:0] gives 0-15, subtract MAX_ELEVATION, then clamp
+                    rand_offset = lfsr[3:0];
+                    if (rand_offset > (2 * MAX_ELEVATION))
+                        rand_offset = 2 * MAX_ELEVATION;
+                    current_y = prev_y + rand_offset - MAX_ELEVATION;
+
                     if (current_y < low_limit) current_y = low_limit;
                     if (current_y > high_limit) current_y = high_limit;
                 end
 
-                terrain[left_idx] <= current_y;
-                if (right_idx != left_idx) begin
-                    terrain[right_idx] <= current_y;
-                end
+                terrain[left_idx] <= current_y[5:0];
+                if (right_idx != left_idx)
+                    terrain[right_idx] <= current_y[5:0];
 
-                prev_y <= current_y;
+                prev_y <= current_y[5:0];
                 i <= i + 1;
+            end else begin
+                done <= 1;
             end
         end
     end
-
 endmodule
