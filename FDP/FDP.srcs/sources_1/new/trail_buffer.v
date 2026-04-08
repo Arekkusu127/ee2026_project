@@ -21,26 +21,24 @@
 
 
 module trail_buffer (
-    input clk,
-    input reset,
-    input trail_clear,
-    input trail_wr_en,
-    input [12:0] trail_wr_addr,
-    input [12:0] trail_rd_addr,
-    output trail_rd_data
+    input         clk,
+    input         reset,
+    input         trail_clear,
+    // Write port: set pixel at (wr_x, wr_y)
+    input         trail_wr_en,
+    input  [6:0]  trail_wr_x,
+    input  [5:0]  trail_wr_y,
+    // Read port: read pixel at (rd_x, rd_y)
+    input  [6:0]  trail_rd_x,
+    input  [5:0]  trail_rd_y,
+    output        trail_rd_data
 );
-    // 6144 bits = 96*64
-    // Use a block RAM style
-    reg [63:0] trail_mem [0:95]; // 96 columns, 64 bits each (one per row)
+    // 96 columns x 64 rows, stored as 96 x 64-bit words
+    reg [63:0] trail_mem [0:95];
     
-    wire [6:0] wr_col = trail_wr_addr % 96;  // TODO: optimize
-    wire [5:0] wr_row = trail_wr_addr / 96;
-    
-    wire [6:0] rd_col = trail_rd_addr % 96;
-    wire [5:0] rd_row = trail_rd_addr / 96;
-    
-    // Read
-    assign trail_rd_data = trail_mem[rd_col][rd_row];
+    // Read - combinational
+    assign trail_rd_data = (trail_rd_x < 7'd96 && trail_rd_y < 6'd64) ? 
+                           trail_mem[trail_rd_x][trail_rd_y] : 1'b0;
     
     integer i;
     always @(posedge clk) begin
@@ -48,8 +46,10 @@ module trail_buffer (
             for (i = 0; i < 96; i = i + 1)
                 trail_mem[i] <= 64'd0;
         end else if (trail_wr_en) begin
-            trail_mem[wr_col][wr_row] <= 1'b1;
+            if (trail_wr_x < 7'd96 && trail_wr_y < 6'd64)
+                trail_mem[trail_wr_x][trail_wr_y] <= 1'b1;
         end
     end
 endmodule
+
 

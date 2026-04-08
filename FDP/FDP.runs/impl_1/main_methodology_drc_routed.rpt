@@ -1,7 +1,7 @@
 Copyright 1986-2018 Xilinx, Inc. All Rights Reserved.
 --------------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2018.2 (win64) Build 2258646 Thu Jun 14 20:03:12 MDT 2018
-| Date         : Wed Apr  8 20:21:41 2026
+| Date         : Wed Apr  8 20:38:14 2026
 | Host         : LAPTOP-TX5PRO running 64-bit major release  (build 9200)
 | Command      : report_methodology -file main_methodology_drc_routed.rpt -pb main_methodology_drc_routed.pb -rpx main_methodology_drc_routed.rpx
 | Design       : main
@@ -83,7 +83,7 @@ Related violations: <none>
 
 LUTAR-1#1 Warning
 LUT drives async reset alert  
-LUT cell game_fsm/lfsr_inst/FSM_sequential_move_step[1]_i_2, with 2 or more inputs, drives asynchronous preset/clear pin(s) game_fsm/FSM_sequential_move_step_reg[0]/CLR, game_fsm/FSM_sequential_move_step_reg[1]/CLR, game_fsm/ai_angle_reg[1]/CLR, game_fsm/ai_angle_reg[4]/CLR, game_fsm/ai_delay_reg[0]/CLR, game_fsm/ai_delay_reg[1]/CLR, game_fsm/ai_delay_reg[2]/CLR, game_fsm/ai_delay_reg[3]/CLR, game_fsm/ai_delay_reg[4]/CLR, game_fsm/ai_power_reg[3]/CLR, game_fsm/anim_ticks_reg[0]/CLR, game_fsm/anim_ticks_reg[1]/CLR, game_fsm/anim_ticks_reg[2]/CLR, game_fsm/anim_ticks_reg[3]/CLR, game_fsm/anim_ticks_reg[4]/CLR (the first 15 of 328 listed). The LUT may glitch and trigger an unexpected reset, even if it is a properly timed path.
+LUT cell game_fsm/lfsr_inst/FSM_sequential_move_step[1]_i_2, with 2 or more inputs, drives asynchronous preset/clear pin(s) game_fsm/FSM_sequential_move_step_reg[0]/CLR, game_fsm/FSM_sequential_move_step_reg[1]/CLR, game_fsm/ai_angle_reg[1]/CLR, game_fsm/ai_angle_reg[4]/CLR, game_fsm/ai_delay_reg[0]/CLR, game_fsm/ai_delay_reg[1]/CLR, game_fsm/ai_delay_reg[2]/CLR, game_fsm/ai_delay_reg[3]/CLR, game_fsm/ai_delay_reg[4]/CLR, game_fsm/ai_power_reg[3]/CLR, game_fsm/anim_ticks_reg[0]/CLR, game_fsm/anim_ticks_reg[1]/CLR, game_fsm/anim_ticks_reg[2]/CLR, game_fsm/anim_ticks_reg[3]/CLR, game_fsm/anim_ticks_reg[4]/CLR (the first 15 of 327 listed). The LUT may glitch and trigger an unexpected reset, even if it is a properly timed path.
 Related violations: <none>
 
 SYNTH-4#1 Warning

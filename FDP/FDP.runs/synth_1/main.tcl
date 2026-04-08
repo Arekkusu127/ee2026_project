@@ -40,6 +40,7 @@ read_verilog -library xil_defaultlib {
   C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/sin_lut.v
   C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/ss_display.v
   C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/terrain_ram.v
+  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/trail_buffer.v
   C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/main.v
 }
 # Mark all dcp files as not used in implementation to prevent them from being

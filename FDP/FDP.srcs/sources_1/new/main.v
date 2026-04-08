@@ -56,7 +56,6 @@ module main(
     debounce db_ar   (.clk(clk), .rst(rst), .btn_in(BTNR),  .btn_out(ar_pulse));
 
     // ---- Start menu state ----
-    // 0 = start menu, 1 = in game
     reg game_started;
     reg fire_pulse_prev;
     always @(posedge clk or posedge rst) begin
@@ -70,13 +69,12 @@ module main(
         end
     end
 
-    // Gate inputs to game_state: only pass through when game is started
     wire game_fire = game_started ? fire_pulse : 1'b0;
     wire game_au   = game_started ? au_pulse   : 1'b0;
     wire game_ad   = game_started ? ad_pulse   : 1'b0;
     wire game_al   = game_started ? al_pulse   : 1'b0;
     wire game_ar   = game_started ? ar_pulse   : 1'b0;
-    wire game_rst  = rst | (!game_started); // hold game in reset until started
+    wire game_rst  = rst | (!game_started);
 
     // ---- Game state signals ----
     wire [2:0]  game_phase;
@@ -93,7 +91,6 @@ module main(
     wire [5:0]  proj_y;
     wire        victory, defeat;
     wire [3:0]  player_fuel;
-    wire [3:0]  move_phase;  // 1 = moving, 0 = not moving
 
     wire [45:0] player_entity;
     wire [45:0] enemy_entity_0;
@@ -120,14 +117,31 @@ module main(
         .wr_data(terrain_wr_data)
     );
 
-    // ---- Determine skill from switches ----
-    // Switches select projectile based on energy cost
-    // sw[0] = cost 1, sw[1] = cost 2, ... sw[14] = cost 15, sw[13:0] highest active
-    // No switch = basic (cost 0)
-    // Player can only use projectiles whose cost <= energy (enforced by LED visibility)
+    // ---- Trail buffer signals ----
+    wire        trail_clear;
+    wire        trail_wr_en;
+    wire [6:0]  trail_wr_x;
+    wire [5:0]  trail_wr_y;
+    wire        trail_rd_data;
+
+    wire [6:0] pix_x;
+    wire [5:0] pix_y;
+
+    trail_buffer trail_inst (
+        .clk(clk),
+        .reset(game_rst),
+        .trail_clear(trail_clear),
+        .trail_wr_en(trail_wr_en),
+        .trail_wr_x(trail_wr_x),
+        .trail_wr_y(trail_wr_y),
+        .trail_rd_x(pix_x),
+        .trail_rd_y(pix_y),
+        .trail_rd_data(trail_rd_data)
+    );
+
+    // ---- Skill selection ----
     reg [3:0] skill_sel;
     always @(*) begin
-        // Priority encode: highest active switch that is <= energy
         if      (sw[14] && player_energy >= 4'd15) skill_sel = 4'd15;
         else if (sw[13] && player_energy >= 4'd14) skill_sel = 4'd14;
         else if (sw[12] && player_energy >= 4'd13) skill_sel = 4'd13;
@@ -164,6 +178,10 @@ module main(
         .terrain_wr_en(terrain_wr_en),
         .terrain_wr_addr(terrain_wr_addr),
         .terrain_wr_data(terrain_wr_data),
+        .trail_clear(trail_clear),
+        .trail_wr_en(trail_wr_en),
+        .trail_wr_x(trail_wr_x),
+        .trail_wr_y(trail_wr_y),
         .game_phase(game_phase),
         .player_x(player_x),
         .player_y(player_y),
@@ -187,7 +205,6 @@ module main(
         .hit_damage(hit_damage)
     );
 
-    // Hit event signals from game_state
     wire        hit_event;
     wire [7:0]  hit_damage;
 
@@ -196,8 +213,6 @@ module main(
     wire [12:0] pixel_index;
     wire [15:0] pixel_data;
 
-    wire [6:0] pix_x;
-    wire [5:0] pix_y;
     assign pix_x = pixel_index % 96;
     assign pix_y = pixel_index / 96;
 
@@ -223,10 +238,11 @@ module main(
         .terrain_height(terrain_rd_data_b),
         .victory(victory),
         .defeat(defeat),
+        .trail_pixel(trail_rd_data),
         .pixel_data(pixel_data)
     );
 
-    // ---- OLED display driver (UNTOUCHED) ----
+    // ---- OLED display driver ----
     Oled_Display oled_inst (
         .clk(clk_6p25),
         .reset(rst),
@@ -244,34 +260,28 @@ module main(
         .pmoden(oled_pmoden)
     );
 
-    // ---- LED output: Energy bar OR Fuel gauge ----
-    // During MOVE phase: LEDs show fuel (0-10 mapped to 16 LEDs)
-    // During AIM/other phases: LEDs show energy (0-16)
-    // game_phase: PH_MOVE = 3'd7 (new phase)
+    // ---- LED output: Fuel (10 LEDs) or Energy bar ----
     reg [15:0] led_out;
     always @(*) begin
         if (!game_started) begin
-            // Idle animation on start menu - all LEDs blink
             led_out = 16'hFFFF;
         end else if (game_phase == 3'd7) begin
-            // MOVE phase: fuel gauge
-            // player_fuel is 0-10, map to 16 LEDs proportionally
-            // fuel 10 = all 16, fuel 5 = 8, fuel 0 = 0
+            // MOVE phase: fuel gauge using LEDs [9:0] only (10 LEDs)
+            // LED[i] on if fuel > i
             case (player_fuel)
-                4'd10: led_out = 16'hFFFF;
-                4'd9:  led_out = 16'h7FFF;
-                4'd8:  led_out = 16'h3FFF;
-                4'd7:  led_out = 16'h1FFF;
-                4'd6:  led_out = 16'h0FFF;
-                4'd5:  led_out = 16'h07FF;
-                4'd4:  led_out = 16'h03FF;
-                4'd3:  led_out = 16'h01FF;
-                4'd2:  led_out = 16'h00FF;
-                4'd1:  led_out = 16'h007F;
+                4'd10: led_out = 16'h03FF;  // bits [9:0] all on
+                4'd9:  led_out = 16'h01FF;
+                4'd8:  led_out = 16'h00FF;
+                4'd7:  led_out = 16'h007F;
+                4'd6:  led_out = 16'h003F;
+                4'd5:  led_out = 16'h001F;
+                4'd4:  led_out = 16'h000F;
+                4'd3:  led_out = 16'h0007;
+                4'd2:  led_out = 16'h0003;
+                4'd1:  led_out = 16'h0001;
                 default: led_out = 16'h0000;
             endcase
         end else begin
-            // Energy bar: light up LEDs 0 through (energy-1)
             case (player_energy)
                 4'd0:  led_out = 16'h0000;
                 4'd1:  led_out = 16'h0001;
@@ -295,7 +305,7 @@ module main(
     end
     assign led = led_out;
 
-    // ---- 7-seg display: HP default, damage on hit for 5 seconds ----
+    // ---- 7-seg display ----
     ss_display seg_inst (
         .clk(clk),
         .rst(rst),

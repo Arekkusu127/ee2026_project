@@ -31,6 +31,11 @@ module game_state(
     output reg        terrain_wr_en,
     output reg [6:0]  terrain_wr_addr,
     output reg [5:0]  terrain_wr_data,
+    // trail buffer control
+    output reg        trail_clear,
+    output reg        trail_wr_en,
+    output reg [6:0]  trail_wr_x,
+    output reg [5:0]  trail_wr_y,
     // outputs
     output reg [2:0]  game_phase,
     output [6:0]      player_x,
@@ -63,13 +68,12 @@ module game_state(
     localparam PH_RESOLVE  = 3'd4;
     localparam PH_NEXTTURN = 3'd5;
     localparam PH_GAMEOVER = 3'd6;
-    localparam PH_MOVE     = 3'd7;  // NEW: Movement phase before aiming
+    localparam PH_MOVE     = 3'd7;
 
     localparam TYPE_PLAYER = 2'b00;
     localparam TYPE_MINION = 2'b01;
     localparam TYPE_BOSS   = 2'b10;
 
-    // Pack entity
     function [45:0] pack_entity;
         input [1:0]  etype;
         input [5:0]  hp;
@@ -122,7 +126,11 @@ module game_state(
     // Fixed-point projectile (x256)
     reg signed [20:0] proj_fx, proj_fy;
     reg signed [15:0] proj_vx, proj_vy;
-    localparam signed [15:0] GRAVITY = 16'sd10;
+    // INCREASED GRAVITY for visible parabola
+    localparam signed [15:0] GRAVITY = 16'sd30;
+
+    // Trail write counter - only write every N ticks for dotted effect
+    reg [2:0] trail_tick_cnt;
 
     // 30 Hz tick
     reg [21:0] tick_cnt;
@@ -179,7 +187,7 @@ module game_state(
     // LUT ready flag
     reg        lut_ready;
 
-    // Movement: move_pending for terrain lookup
+    // Movement
     reg [1:0]  move_step;
     reg [6:0]  move_target_x;
 
@@ -283,19 +291,26 @@ module game_state(
             hit_damage        <= 0;
             move_step         <= 0;
             move_target_x     <= 0;
+            trail_clear       <= 0;
+            trail_wr_en       <= 0;
+            trail_wr_x        <= 0;
+            trail_wr_y        <= 0;
+            trail_tick_cnt    <= 0;
 
-            player_entity  <= pack_entity(TYPE_PLAYER, 6'd50, 6'd5, 6'd25, 6'd12, 7'd10, 6'd0, 4'd4, 3'd4);
-            enemy_entity_0 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd55, 6'd0, 4'd3, 3'd4);
-            enemy_entity_1 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd70, 6'd0, 4'd3, 3'd4);
-            enemy_entity_2 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd85, 6'd0, 4'd3, 3'd4);
+            // HITBOX CHANGES: player hw=3, hh=3; minions hw=2, hh=3; boss hw=4, hh=4
+            player_entity  <= pack_entity(TYPE_PLAYER, 6'd50, 6'd5, 6'd25, 6'd12, 7'd10, 6'd0, 4'd3, 3'd3);
+            enemy_entity_0 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd55, 6'd0, 4'd2, 3'd3);
+            enemy_entity_1 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd70, 6'd0, 4'd2, 3'd3);
+            enemy_entity_2 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd85, 6'd0, 4'd2, 3'd3);
 
             real_hp_enemy[0] <= 9'd50;
             real_hp_enemy[1] <= 9'd50;
             real_hp_enemy[2] <= 9'd50;
         end else begin
             terrain_wr_en <= 0;
+            trail_clear   <= 0;
+            trail_wr_en   <= 0;
             
-            // Clear hit_event after it's been set (pulse)
             if (hit_event && tick_30hz)
                 hit_event <= 0;
 
@@ -326,7 +341,7 @@ module game_state(
                 3'd3: begin
                     player_entity <= set_pos(player_entity,
                         ent_px(player_entity),
-                        (terrain_rd_data_a >= 6'd8) ? terrain_rd_data_a - 6'd7 : 6'd1);
+                        (terrain_rd_data_a >= 6'd6) ? terrain_rd_data_a - 6'd5 : 6'd1);
                     terrain_rd_addr_a <= ent_px(enemy_entity_0);
                     init_step <= 3'd4;
                 end
@@ -334,11 +349,11 @@ module game_state(
                     if (current_round)
                         enemy_entity_0 <= set_pos(enemy_entity_0,
                             ent_px(enemy_entity_0),
-                            (terrain_rd_data_a >= 6'd10) ? terrain_rd_data_a - 6'd9 : 6'd1);
+                            (terrain_rd_data_a >= 6'd7) ? terrain_rd_data_a - 6'd6 : 6'd1);
                     else
                         enemy_entity_0 <= set_pos(enemy_entity_0,
                             ent_px(enemy_entity_0),
-                            (terrain_rd_data_a >= 6'd8) ? terrain_rd_data_a - 6'd7 : 6'd1);
+                            (terrain_rd_data_a >= 6'd6) ? terrain_rd_data_a - 6'd5 : 6'd1);
                     if (!current_round) begin
                         terrain_rd_addr_a <= ent_px(enemy_entity_1);
                         init_step <= 3'd5;
@@ -349,18 +364,17 @@ module game_state(
                 3'd5: begin
                     enemy_entity_1 <= set_pos(enemy_entity_1,
                         ent_px(enemy_entity_1),
-                        (terrain_rd_data_a >= 6'd8) ? terrain_rd_data_a - 6'd7 : 6'd1);
+                        (terrain_rd_data_a >= 6'd6) ? terrain_rd_data_a - 6'd5 : 6'd1);
                     terrain_rd_addr_a <= ent_px(enemy_entity_2);
                     init_step <= 3'd6;
                 end
                 3'd6: begin
                     enemy_entity_2 <= set_pos(enemy_entity_2,
                         ent_px(enemy_entity_2),
-                        (terrain_rd_data_a >= 6'd8) ? terrain_rd_data_a - 6'd7 : 6'd1);
+                        (terrain_rd_data_a >= 6'd6) ? terrain_rd_data_a - 6'd5 : 6'd1);
                     init_step <= 3'd7;
                 end
                 3'd7: begin
-                    // Start with MOVE phase for player turn
                     game_phase        <= PH_MOVE;
                     is_player_turn    <= 1;
                     current_enemy_idx <= 0;
@@ -373,27 +387,21 @@ module game_state(
                 endcase
             end
 
-            // ===== MOVE PHASE (NEW) =====
-            // Player can move left/right, 1 pixel per press, up to 10 total (fuel)
-            // LEDs show fuel. When fuel=0 or btnC pressed, go to AIM.
+            // ===== MOVE PHASE =====
             PH_MOVE: begin
                 if (is_player_turn) begin
                     case (move_step)
                     2'd0: begin
-                        // Wait for input
                         if (confirm_aim || player_fuel == 4'd0) begin
-                            // Transition to AIM
                             game_phase <= PH_AIM;
                             move_step  <= 0;
                         end else if (move_left && player_fuel > 0) begin
-                            // Try move left
                             if (ent_px(player_entity) > 7'd1) begin
                                 move_target_x <= ent_px(player_entity) - 7'd1;
                                 terrain_rd_addr_a <= ent_px(player_entity) - 7'd1;
                                 move_step <= 2'd1;
                             end
                         end else if (move_right && player_fuel > 0) begin
-                            // Try move right
                             if (ent_px(player_entity) < 7'd94) begin
                                 move_target_x <= ent_px(player_entity) + 7'd1;
                                 terrain_rd_addr_a <= ent_px(player_entity) + 7'd1;
@@ -402,21 +410,18 @@ module game_state(
                         end
                     end
                     2'd1: begin
-                        // Wait for terrain read
                         move_step <= 2'd2;
                     end
                     2'd2: begin
-                        // Place player on new terrain
                         player_entity <= set_pos(player_entity,
                             move_target_x,
-                            (terrain_rd_data_a >= 6'd8) ? terrain_rd_data_a - 6'd7 : 6'd1);
+                            (terrain_rd_data_a >= 6'd6) ? terrain_rd_data_a - 6'd5 : 6'd1);
                         player_fuel <= player_fuel - 1;
                         move_step <= 2'd0;
                     end
                     default: move_step <= 2'd0;
                     endcase
                 end else begin
-                    // Enemy doesn't move, skip to aim
                     game_phase <= PH_AIM;
                 end
             end
@@ -429,13 +434,14 @@ module game_state(
                     if (power_up   && player_power < 4'd15) player_power <= player_power + 1;
                     if (power_down && player_power > 4'd1)  player_power <= player_power - 1;
                     if (fire_btn) begin
-                        // Check energy
                         if (player_energy >= skill_energy_cost) begin
                             player_energy <= player_energy - skill_energy_cost;
                             fire_dir_right <= 1;
                             lut_angle      <= player_angle;
                             game_phase     <= PH_FIRE;
                             lut_ready      <= 0;
+                            // Clear trail on new shot
+                            trail_clear    <= 1;
                         end
                     end
                 end else begin
@@ -453,6 +459,7 @@ module game_state(
                         end
                         game_phase <= PH_FIRE;
                         lut_ready  <= 0;
+                        trail_clear <= 1;
                     end
                 end
             end
@@ -473,14 +480,16 @@ module game_state(
                     end
                     lut_ready <= 1;
                 end else begin
-                    proj_active <= 1;
-                    anim_ticks  <= 0;
+                    proj_active    <= 1;
+                    anim_ticks     <= 0;
+                    trail_tick_cnt <= 0;
 
                     if (is_player_turn) begin
                         proj_fx <= {ent_px(player_entity), 8'd128};
                         proj_fy <= {ent_py(player_entity), 8'd0};
-                        proj_vx <= $signed({1'b0, player_power}) * $signed({1'b0, cos_val});
-                        proj_vy <= -($signed({1'b0, player_power}) * $signed({1'b0, sin_val}));
+                        // REDUCED SPEED: divide cos/sin by 2 via right shift
+                        proj_vx <= ($signed({1'b0, player_power}) * $signed({1'b0, cos_val})) >>> 1;
+                        proj_vy <= -(($signed({1'b0, player_power}) * $signed({1'b0, sin_val})) >>> 1);
                         proj_x  <= ent_px(player_entity);
                         proj_y  <= ent_py(player_entity);
                     end else begin
@@ -508,8 +517,9 @@ module game_state(
                                 proj_fy <= 0;
                             end
                         endcase
-                        proj_vx <= -($signed({1'b0, ai_power}) * $signed({1'b0, cos_val}));
-                        proj_vy <= -($signed({1'b0, ai_power}) * $signed({1'b0, sin_val}));
+                        // REDUCED SPEED for enemy too
+                        proj_vx <= -(($signed({1'b0, ai_power}) * $signed({1'b0, cos_val})) >>> 1);
+                        proj_vy <= -(($signed({1'b0, ai_power}) * $signed({1'b0, sin_val})) >>> 1);
                     end
 
                     game_phase <= PH_ANIMATE;
@@ -532,6 +542,17 @@ module game_state(
 
                     if (!proj_fx[20])
                         terrain_rd_addr_a <= proj_fx[14:8];
+
+                    // Write trail every 2 ticks for dotted effect
+                    trail_tick_cnt <= trail_tick_cnt + 1;
+                    if (trail_tick_cnt[0] == 1'b0) begin
+                        if (!proj_fx[20] && proj_fx[14:8] < 7'd96 &&
+                            !proj_fy[20] && proj_fy[13:8] < 6'd64) begin
+                            trail_wr_en <= 1;
+                            trail_wr_x  <= proj_fx[14:8];
+                            trail_wr_y  <= proj_fy[13:8];
+                        end
+                    end
 
                     if (proj_fx[20] || proj_fx[14:8] >= 7'd96 ||
                         (!proj_fy[20] && proj_fy[13:8] >= 6'd63)) begin
@@ -659,7 +680,8 @@ module game_state(
                             current_round   <= 1;
                             player_energy   <= 4'd12;
                             player_entity[25:20] <= 6'd12;
-                            enemy_entity_0 <= pack_entity(TYPE_BOSS, 6'd50, 6'd8, 6'd30, 6'd0, 7'd80, 6'd0, 4'd5, 3'd5);
+                            // Boss hitbox: hw=4, hh=4
+                            enemy_entity_0 <= pack_entity(TYPE_BOSS, 6'd50, 6'd8, 6'd30, 6'd0, 7'd80, 6'd0, 4'd4, 3'd4);
                             enemy_entity_1 <= 46'd0;
                             enemy_entity_2 <= 46'd0;
                             real_hp_enemy[0] <= 9'd400;
@@ -694,7 +716,7 @@ module game_state(
                     end else begin
                         current_enemy_idx <= 2'd0;
                     end
-                    game_phase <= PH_MOVE;  // Enemy goes through MOVE (which skips for AI)
+                    game_phase <= PH_MOVE;
                 end else begin
                     if (!current_round) begin
                         if (current_enemy_idx == 2'd0 && (enemy_alive[1] || enemy_alive[2])) begin
@@ -706,7 +728,7 @@ module game_state(
                             game_phase <= PH_MOVE;
                         end else begin
                             is_player_turn <= 1;
-                            player_fuel    <= 4'd10;  // Reset fuel for player
+                            player_fuel    <= 4'd10;
                             game_phase     <= PH_MOVE;
                         end
                     end else begin
