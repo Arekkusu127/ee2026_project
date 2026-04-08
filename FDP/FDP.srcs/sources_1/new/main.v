@@ -8,9 +8,11 @@
 //  STUDENT R NAME: Qiang Jiayuan
 //  STUDENT S NAME: Sun Shaohan
 //
+//  Integrate all functions together
+// 
 //////////////////////////////////////////////////////////////////////////////////
 
-module Top_Student ();
+module main ();
     
     
 
