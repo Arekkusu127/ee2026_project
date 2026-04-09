@@ -280,20 +280,26 @@ module render(
         (pix_x < player_bar_left + player_hp_fill_w);
 
     // Boss HP bar (round 2)
-    wire signed [7:0] boss_bar_top = $signed({2'b0, ey0}) - $signed({5'b0, ehh0}) - 8'sd7;
-    wire signed [7:0] boss_bar_bot = $signed({2'b0, ey0}) - $signed({5'b0, ehh0}) - 8'sd3;
-    wire boss_hp_bar_region = boss_phase &&
-        (pix_x == ex0 || pix_x == ex0 - 7'd1) &&
-        ($signed({2'b0, pix_y}) >= boss_bar_top) &&
-        ($signed({2'b0, pix_y}) <= boss_bar_bot) &&
-        (boss_bar_top >= 0);
-    wire [2:0] boss_fill = (ehp0 >= 6'd50) ? 3'd5 :
-                           (ehp0 >= 6'd40) ? 3'd4 :
-                           (ehp0 >= 6'd30) ? 3'd3 :
-                           (ehp0 >= 6'd20) ? 3'd2 :
-                           (ehp0 >= 6'd10) ? 3'd1 : 3'd0;
-    wire signed [7:0] boss_fill_top = boss_bar_bot - $signed({5'b0, boss_fill}) + 8'sd1;
-    wire boss_hp_filled = boss_hp_bar_region && ($signed({2'b0, pix_y}) >= boss_fill_top);
+    wire [6:0] boss_bar_left  = boss_left + 7'd8;
+    wire [6:0] boss_bar_right = boss_left + 7'd31;   // 24 pixels wide
+    wire [5:0] boss_bar_y0    = (boss_top >= 6'd4) ? (boss_top - 6'd4) : 6'd0;
+    wire [5:0] boss_bar_y1    = (boss_top >= 6'd3) ? (boss_top - 6'd3) : 6'd0;
+
+    wire boss_hp_bar_region =
+        boss_phase &&
+        (pix_x >= boss_bar_left) && (pix_x <= boss_bar_right) &&
+        (pix_y >= boss_bar_y0)   && (pix_y <= boss_bar_y1);
+
+    wire [4:0] boss_hp_fill_w =
+        (ehp0 >= 6'd50) ? 5'd24 :
+        (ehp0 >= 6'd40) ? 5'd19 :
+        (ehp0 >= 6'd30) ? 5'd14 :
+        (ehp0 >= 6'd20) ? 5'd10 :
+        (ehp0 >= 6'd10) ? 5'd5  : 5'd0;
+
+    wire boss_hp_filled =
+        boss_hp_bar_region &&
+        (pix_x < boss_bar_left + boss_hp_fill_w);
 
     // Slime 0 HP bar (horizontal)
     wire slime0_bar_region = slime_phase && enemy_alive[0] &&

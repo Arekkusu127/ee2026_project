@@ -139,6 +139,7 @@ module game_state(
     reg [8:0] next_enemy_hp2;
     reg [2:0] next_enemy_alive;
     reg [5:0] enemy_attack_damage;
+    reg boss_beam_hit_player;
 
     // ---- Projectile physics (fixed point: 8 fractional bits) ----
     reg signed [20:0] proj_fx, proj_fy;
@@ -348,6 +349,7 @@ module game_state(
     // ====== MAIN FSM ======
     always @(posedge clk or posedge rst) begin
         if (rst) begin
+            boss_beam_hit_player <= 0;
             boss_attack_active <= 0;
             boss_attack_x     <=0;
             game_phase        <= PH_INIT;
@@ -684,6 +686,7 @@ module game_state(
                     if (!is_player_turn && current_round) begin
                         boss_attack_active <= 1'b1;
                         boss_attack_x      <= 7'd0;
+                        boss_beam_hit_player  <= 1'b0;
                         proj_active        <= 1'b0;
                         game_phase         <= PH_ANIMATE;
                         fire_step          <= 0;
@@ -747,12 +750,17 @@ module game_state(
                 if (!is_player_turn && current_round && boss_attack_active) begin
                     if (tick_30hz) begin
                         anim_ticks <= anim_ticks + 1;
+                        if ((boss_attack_x <= ent_px(player_entity) + {3'd0, ent_hw(player_entity)}) &&
+                            (boss_attack_x + 7'd1 >= ent_px(player_entity) - {3'd0, ent_hw(player_entity)})) begin
+                            boss_beam_hit_player <= 1'b1;
+                        end
+
                         if (boss_attack_x >= 7'd95) begin
                             boss_attack_active <= 0;
                             game_phase         <= PH_RESOLVE;
                             resolve_step       <= 0;
                         end else begin
-                             boss_attack_x <= boss_attack_x + 7'd2;
+                            boss_attack_x <= boss_attack_x + 7'd2;
                         end
                     end
                 end else begin
@@ -884,8 +892,7 @@ module game_state(
                     end
                     else if (current_round) begin
                         // Boss beam damages player
-                        if ((boss_attack_x <= ent_px(player_entity) + {3'd0, ent_hw(player_entity)}) &&
-                            (boss_attack_x + 7'd1 >= ent_px(player_entity) - {3'd0, ent_hw(player_entity)})) begin
+                        if (boss_beam_hit_player) begin
                             if (next_player_hp <= 9'd50) begin
                                 hit_event      <= 1'b1;
                                 hit_damage     <= next_player_hp[7:0];
