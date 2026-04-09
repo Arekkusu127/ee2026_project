@@ -59,7 +59,9 @@ module game_state(
     output reg        hit_event,
     output reg [7:0]  hit_damage,
     output reg [6:0]  reticle_x,
-    output reg [5:0]  reticle_y
+    output reg [5:0]  reticle_y,
+    output reg boss_attack_active,
+    output reg[6:0] boss_attack_x
 );
 
     localparam PH_INIT     = 3'd0;
@@ -334,6 +336,8 @@ module game_state(
     // ====== MAIN FSM ======
     always @(posedge clk or posedge rst) begin
         if (rst) begin
+            boss_attack_active <= 0;
+            boss_attack_x     <=0;
             game_phase        <= PH_INIT;
             real_hp_player    <= 9'd200;
             player_angle      <= 7'd45;
@@ -646,22 +650,27 @@ module game_state(
                         end
                     end
                 end else begin
-                    if (ai_delay < 6'd30) begin
-                        if (tick_30hz) ai_delay <= ai_delay + 1;
-                    end else begin
-                        ai_delay       <= 0;
-                        fire_dir_right <= 0;
-                        if (!current_round) begin
-                            ai_angle <= 7'd40 + {3'd0, rng[3:0]};
-                            ai_power <= 4'd6  + {2'd0, rng[5:4]};
+                    if (current_round) begin
+                        if (ai_delay < 6'd20) begin
+                            if (tick_30hz) ai_delay <= ai_delay + 1;
                         end else begin
-                            ai_angle <= 7'd38 + {4'd0, rng[2:0]};
-                            ai_power <= 4'd8  + {2'd0, rng[4:3]};
+                            ai_delay   <= 0;
+                            game_phase <= PH_FIRE;
+                            fire_step  <= 0;
                         end
-                        game_phase  <= PH_FIRE;
-                        lut_ready   <= 0;
-                        fire_step   <= 0;
-                        trail_clear <= 1;
+                    end else begin
+                        if (ai_delay < 6'd30) begin
+                            if (tick_30hz) ai_delay <= ai_delay + 1;
+                        end else begin
+                            ai_delay       <= 0;
+                            fire_dir_right <= 0;
+                            ai_angle       <= 7'd40 + {3'd0, rng[3:0]};
+                            ai_power       <= 4'd6  + {2'd0, rng[5:4]};
+                            game_phase     <= PH_FIRE;
+                            lut_ready      <= 0;
+                            fire_step      <= 0;
+                            trail_clear    <= 1;
+                        end
                     end
                 end
             end
@@ -670,79 +679,90 @@ module game_state(
             PH_FIRE: begin
                 case (fire_step)
                 2'd0: begin
-                    if (!is_player_turn) begin
-                        if (!current_round) begin
-                            lut_angle <= (ai_angle > 7'd55) ? 7'd55 : ai_angle;
-                            if (ai_power > 4'd9) ai_power <= 4'd9;
-                        end else begin
-                            lut_angle <= (ai_angle > 7'd45) ? 7'd45 : ai_angle;
-                            if (ai_power > 4'd11) ai_power <= 4'd11;
-                        end
+                    if (!is_player_turn && !current_round) begin
+                        lut_angle <= (ai_angle > 7'd55) ? 7'd55 : ai_angle;
                     end
                     fire_step <= 2'd1;
                 end
+
                 2'd1: begin
-                    proj_active    <= 1;
-                    anim_ticks     <= 0;
-                    trail_tick_cnt <= 0;
+                    anim_ticks <= 0;
 
-                    if (is_player_turn) begin
-                        proj_fx <= {ent_px(player_entity), 8'd128};
-                        proj_fy <= {ent_py(player_entity), 8'd0};
-
-                        // Use same velocity formula as arc preview
-                        if (reticle_right)
-                            proj_vx <= $signed({1'b0, computed_power}) * $signed({1'b0, cos_val});
-                        else
-                            proj_vx <= -($signed({1'b0, computed_power}) * $signed({1'b0, cos_val}));
-
-                        if (reticle_above)
-                            proj_vy <= -($signed({1'b0, computed_power}) * $signed({1'b0, sin_val}));
-                        else
-                            proj_vy <= $signed({1'b0, computed_power}) * $signed({1'b0, sin_val});
-
-                        proj_x <= ent_px(player_entity);
-                        proj_y <= ent_py(player_entity);
+                    if (!is_player_turn && current_round) begin
+                        boss_attack_active <= 1'b1;
+                        boss_attack_x      <= 7'd0;
+                        proj_active        <= 1'b0;
+                        game_phase         <= PH_ANIMATE;
+                        fire_step          <= 0;
                     end else begin
-                        case (current_enemy_idx)
-                            2'd0: begin
-                                proj_fx <= {ent_px(enemy_entity_0), 8'd128};
-                                proj_fy <= {ent_py(enemy_entity_0), 8'd0};
-                                proj_x  <= ent_px(enemy_entity_0);
-                                proj_y  <= ent_py(enemy_entity_0);
-                            end
-                            2'd1: begin
-                                proj_fx <= {ent_px(enemy_entity_1), 8'd128};
-                                proj_fy <= {ent_py(enemy_entity_1), 8'd0};
-                                proj_x  <= ent_px(enemy_entity_1);
-                                proj_y  <= ent_py(enemy_entity_1);
-                            end
-                            2'd2: begin
-                                proj_fx <= {ent_px(enemy_entity_2), 8'd128};
-                                proj_fy <= {ent_py(enemy_entity_2), 8'd0};
-                                proj_x  <= ent_px(enemy_entity_2);
-                                proj_y  <= ent_py(enemy_entity_2);
-                            end
-                            default: begin
-                                proj_fx <= 0;
-                                proj_fy <= 0;
-                            end
-                        endcase
-                        proj_vx <= -($signed({1'b0, ai_power}) * $signed({1'b0, cos_val}));
-                        proj_vy <= -($signed({1'b0, ai_power}) * $signed({1'b0, sin_val}));
-                    end
+                        // keep your existing projectile launch code here
+                        proj_active    <= 1;
+                        anim_ticks     <= 0;
+                        trail_tick_cnt <= 0;
 
-                    game_phase <= PH_ANIMATE;
-                    fire_step  <= 0;
+                        if (is_player_turn) begin
+                            proj_fx <= {ent_px(player_entity), 8'd128};
+                            proj_fy <= {ent_py(player_entity), 8'd0};
+
+                            if (reticle_right)
+                                proj_vx <= $signed({1'b0, computed_power}) * $signed({1'b0, cos_val});
+                            else
+                                proj_vx <= -($signed({1'b0, computed_power}) * $signed({1'b0, cos_val}));
+
+                            if (reticle_above)
+                                proj_vy <= -($signed({1'b0, computed_power}) * $signed({1'b0, sin_val}));
+                            else
+                                proj_vy <=  $signed({1'b0, computed_power}) * $signed({1'b0, sin_val});
+
+                            proj_x <= ent_px(player_entity);
+                            proj_y <= ent_py(player_entity);
+                        end else begin
+                            case (current_enemy_idx)
+                                2'd0: begin
+                                    proj_fx <= {ent_px(enemy_entity_0), 8'd128};
+                                    proj_fy <= {ent_py(enemy_entity_0), 8'd0};
+                                    proj_x  <= ent_px(enemy_entity_0);
+                                    proj_y  <= ent_py(enemy_entity_0);
+                                end
+                                2'd1: begin
+                                    proj_fx <= {ent_px(enemy_entity_1), 8'd128};
+                                    proj_fy <= {ent_py(enemy_entity_1), 8'd0};
+                                    proj_x  <= ent_px(enemy_entity_1);
+                                    proj_y  <= ent_py(enemy_entity_1);
+                                end
+                                2'd2: begin
+                                    proj_fx <= {ent_px(enemy_entity_2), 8'd128};
+                                    proj_fy <= {ent_py(enemy_entity_2), 8'd0};
+                                    proj_x  <= ent_px(enemy_entity_2);
+                                    proj_y  <= ent_py(enemy_entity_2);
+                                end
+                            endcase
+                            proj_vx <= -($signed({1'b0, ai_power}) * $signed({1'b0, cos_val}));
+                            proj_vy <= -($signed({1'b0, ai_power}) * $signed({1'b0, sin_val}));
+                        end
+
+                        game_phase <= PH_ANIMATE;
+                        fire_step  <= 0;
+                    end
                 end
-                default: fire_step <= 2'd0;
                 endcase
             end
 
             // ===== ANIMATE =====
             // No terrain collision - projectile flies until hitting entity or going OOB
             PH_ANIMATE: begin
-                if (tick_30hz) begin
+                if (!is_player_turn && current_round && boss_attack_active) begin
+                    if (tick_30hz) begin
+                        anim_ticks <= anim_ticks + 1;
+                        if (boss_attack_x >= 7'd95) begin
+                            boss_attack_active <= 0;
+                            game_phase         <= PH_RESOLVE;
+                            resolve_step       <= 0;
+                        end else begin
+                             boss_attack_x <= boss_attack_x + 7'd2;
+                        end
+                    end
+                end else begin
                     proj_fx <= proj_fx + {{5{proj_vx[15]}}, proj_vx};
                     proj_fy <= proj_fy + {{5{proj_vy[15]}}, proj_vy};
                     proj_vy <= proj_vy + GRAVITY;
@@ -811,106 +831,98 @@ module game_state(
                 case (resolve_step)
                 3'd0: begin
                     if (is_player_turn) begin
+                        // Player attacks the enemies
                         if (enemy_alive[0] && manhattan(proj_x, proj_y, ent_px(enemy_entity_0), ent_py(enemy_entity_0)) <= {4'd0, skill_blast}) begin
                             if (real_hp_enemy[0] <= {3'd0, skill_damage}) begin
                                 real_hp_enemy[0] <= 9'd0;
-                                hit_event <= 1;
-                                hit_damage <= {2'd0, real_hp_enemy[0][5:0]};
+                                enemy_alive[0]   <= 1'b0;  // Mark enemy 0 as dead
+                                hit_event         <= 1'b1;
+                                hit_damage        <= {2'd0, real_hp_enemy[0][5:0]};
                             end else begin
                                 real_hp_enemy[0] <= real_hp_enemy[0] - {3'd0, skill_damage};
-                                hit_event <= 1;
-                                hit_damage <= {2'd0, skill_damage};
+                                hit_event         <= 1'b1;
+                                hit_damage        <= {2'd0, skill_damage};
                             end
                         end
                         if (enemy_alive[1] && manhattan(proj_x, proj_y, ent_px(enemy_entity_1), ent_py(enemy_entity_1)) <= {4'd0, skill_blast}) begin
                             if (real_hp_enemy[1] <= {3'd0, skill_damage}) begin
                                 real_hp_enemy[1] <= 9'd0;
-                                hit_event <= 1;
-                                hit_damage <= {2'd0, real_hp_enemy[1][5:0]};
+                                enemy_alive[1]   <= 1'b0;  // Mark enemy 1 as dead
+                                hit_event         <= 1'b1;
+                                hit_damage        <= {2'd0, real_hp_enemy[1][5:0]};
                             end else begin
                                 real_hp_enemy[1] <= real_hp_enemy[1] - {3'd0, skill_damage};
-                                hit_event <= 1;
-                                hit_damage <= {2'd0, skill_damage};
+                                hit_event         <= 1'b1;
+                                hit_damage        <= {2'd0, skill_damage};
                             end
                         end
                         if (enemy_alive[2] && manhattan(proj_x, proj_y, ent_px(enemy_entity_2), ent_py(enemy_entity_2)) <= {4'd0, skill_blast}) begin
                             if (real_hp_enemy[2] <= {3'd0, skill_damage}) begin
                                 real_hp_enemy[2] <= 9'd0;
-                                hit_event <= 1;
-                                hit_damage <= {2'd0, real_hp_enemy[2][5:0]};
+                                enemy_alive[2]   <= 1'b0;  // Mark enemy 2 as dead
+                                hit_event         <= 1'b1;
+                                hit_damage        <= {2'd0, real_hp_enemy[2][5:0]};
                             end else begin
                                 real_hp_enemy[2] <= real_hp_enemy[2] - {3'd0, skill_damage};
-                                hit_event <= 1;
-                                hit_damage <= {2'd0, skill_damage};
+                                hit_event         <= 1'b1;
+                                hit_damage        <= {2'd0, skill_damage};
                             end
                         end
                     end else begin
-                        if (manhattan(proj_x, proj_y, ent_px(player_entity), ent_py(player_entity)) <= 8'd5) begin
-                            if (!current_round) begin
-                                if (real_hp_player <= 9'd15) begin
-                                    hit_event <= 1;
-                                    hit_damage <= real_hp_player[7:0];
-                                    real_hp_player <= 9'd0;
+                        // Boss's turn to attack the player
+                        if (current_round) begin
+                            // Boss attack - deduct 50 HP from player's health
+                            if (manhattan(proj_x, proj_y, ent_px(player_entity), ent_py(player_entity)) <= 8'd5) begin
+                                if (real_hp_player <= 9'd50) begin
+                                    hit_event         <= 1'b1;
+                                    hit_damage        <= real_hp_player[7:0];  // Deduct remaining HP
+                                    real_hp_player    <= 9'd0;
                                 end else begin
-                                    real_hp_player <= real_hp_player - 9'd15;
-                                    hit_event <= 1;
-                                    hit_damage <= 8'd15;
-                                end
-                            end else begin
-                                if (real_hp_player <= 9'd30) begin
-                                    hit_event <= 1;
-                                    hit_damage <= real_hp_player[7:0];
-                                    real_hp_player <= 9'd0;
-                                end else begin
-                                    real_hp_player <= real_hp_player - 9'd30;
-                                    hit_event <= 1;
-                                    hit_damage <= 8'd30;
+                                    real_hp_player    <= real_hp_player - 9'd50;  // Deduct 50 HP
+                                    hit_event         <= 1'b1;
+                                    hit_damage        <= 8'd50;
                                 end
                             end
                         end
                     end
 
+                    // Check if any enemies have died
                     if (real_hp_enemy[0] == 9'd0) enemy_alive[0] <= 1'b0;
                     if (real_hp_enemy[1] == 9'd0) enemy_alive[1] <= 1'b0;
                     if (real_hp_enemy[2] == 9'd0) enemy_alive[2] <= 1'b0;
 
-                    player_entity <= set_hp(player_entity,
-                        (real_hp_player[8:2] > 6'd63) ? 6'd63 : real_hp_player[8:2]);
-                    enemy_entity_0 <= set_hp(enemy_entity_0,
-                        (real_hp_enemy[0] > 9'd63) ? 6'd63 : real_hp_enemy[0][5:0]);
-                    enemy_entity_1 <= set_hp(enemy_entity_1,
-                        (real_hp_enemy[1] > 9'd63) ? 6'd63 : real_hp_enemy[1][5:0]);
-                    enemy_entity_2 <= set_hp(enemy_entity_2,
-                        (real_hp_enemy[2] > 9'd63) ? 6'd63 : real_hp_enemy[2][5:0]);
+                    // Update player and enemy HP after attacks
+                    player_entity <= set_hp(player_entity, (real_hp_player[8:2] > 6'd63) ? 6'd63 : real_hp_player[8:2]);
+                    enemy_entity_0 <= set_hp(enemy_entity_0, (real_hp_enemy[0] > 9'd63) ? 6'd63 : real_hp_enemy[0][5:0]);
+                    enemy_entity_1 <= set_hp(enemy_entity_1, (real_hp_enemy[1] > 9'd63) ? 6'd63 : real_hp_enemy[1][5:0]);
+                    enemy_entity_2 <= set_hp(enemy_entity_2, (real_hp_enemy[2] > 9'd63) ? 6'd63 : real_hp_enemy[2][5:0]);
 
-                    // Skip terrain deformation (terrain removed visually)
-                    resolve_step <= 3'd3;
-                end
-                3'd3: begin
+                    // Handle game transitions based on health
                     if (real_hp_player == 9'd0) begin
-                        defeat     <= 1;
+                        defeat <= 1'b1;  // Player lost
                         game_phase <= PH_GAMEOVER;
                     end else if (enemy_alive == 3'b000) begin
                         if (!current_round) begin
-                            current_round <= 1;
+                            current_round <= 1'b1;
                             player_energy <= 4'd12;
-                            player_entity[25:20] <= 6'd12;
-                            enemy_entity_0 <= pack_entity(TYPE_BOSS, 6'd50, 6'd8, 6'd30, 6'd0, 7'd80, 6'd0, 4'd4, 3'd4);
+                            player_entity[25:20] <= 6'd12;  // Reset player energy and stats for next round
+
+                            // Spawn the boss
+                            enemy_entity_0 <= pack_entity(TYPE_BOSS, 6'd150, 6'd30, 6'd40, 6'd0, 7'd80, 6'd0, 4'd5, 3'd4);
                             enemy_entity_1 <= 46'd0;
                             enemy_entity_2 <= 46'd0;
                             real_hp_enemy[0] <= 9'd400;
                             real_hp_enemy[1] <= 9'd0;
                             real_hp_enemy[2] <= 9'd0;
-                            enemy_alive    <= 3'b001;
-                            init_col       <= 0;
-                            init_step      <= 0;
-                            game_phase     <= PH_INIT;
+                            enemy_alive <= 3'b001;  // Only the boss is alive now
+
+                            game_phase <= PH_MOVE;  // Start new round with boss
                         end else begin
-                            victory    <= 1;
+                            victory <= 1'b1;  // Player wins after boss defeat
                             game_phase <= PH_GAMEOVER;
                         end
                     end else begin
-                        game_phase <= PH_NEXTTURN;
+                        game_phase <= PH_NEXTTURN;  // Continue to the next round if there are still enemies
                     end
                     resolve_step <= 0;
                 end

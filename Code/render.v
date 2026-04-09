@@ -8,7 +8,11 @@ module boss(
 );
     reg [15:0] rom [0:1999];
     initial begin
-        $readmemb("D:/FDP/FDP.srcs/sources_1/new/boss.bin", rom);
+        `ifdef SYNTHESIS
+            $readmemb("../../FDP.srcs/sources_1/new/boss.bin", rom);
+        `else
+            $readmemb("../../../../FDP.srcs/sources_1/new/boss.bin", rom);
+        `endif
     end
     wire [10:0] addr = y_pos * 40 + x_pos; // 40 pixels per row
     assign pixel = rom[addr];
