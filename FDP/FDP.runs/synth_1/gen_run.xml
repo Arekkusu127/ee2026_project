@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<GenRun Id="synth_1" LaunchPart="xc7a35tcpg236-1" LaunchTime="1775706033">
+<GenRun Id="synth_1" LaunchPart="xc7a35tcpg236-1" LaunchTime="1775702015">
   <File Type="PA-TCL" Name="main.tcl"/>
   <File Type="RDS-PROPCONSTRS" Name="main_drc_synth.rpt"/>
   <File Type="REPORTS-TCL" Name="main_reports.tcl"/>
@@ -13,8 +13,6 @@
     <Filter Type="Srcs"/>
     <File Path="$PSRCDIR/sources_1/imports/Oled_Display.v">
       <FileInfo>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/imports/Oled_Display.v"/>
-        <Attr Name="ImportTime" Val="1775653018"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -22,8 +20,6 @@
     </File>
     <File Path="$PSRCDIR/sources_1/imports/clk_divider.v">
       <FileInfo>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/imports/clk_divider.v"/>
-        <Attr Name="ImportTime" Val="1775653018"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -31,8 +27,6 @@
     </File>
     <File Path="$PSRCDIR/sources_1/new/cos_lut.v">
       <FileInfo>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/new/cos_lut.v"/>
-        <Attr Name="ImportTime" Val="1775653018"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -40,8 +34,6 @@
     </File>
     <File Path="$PSRCDIR/sources_1/new/debounce.v">
       <FileInfo>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/new/debounce.v"/>
-        <Attr Name="ImportTime" Val="1775653018"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -49,8 +41,6 @@
     </File>
     <File Path="$PSRCDIR/sources_1/new/game_state.v">
       <FileInfo>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/new/game_state.v"/>
-        <Attr Name="ImportTime" Val="1775653018"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -58,8 +48,6 @@
     </File>
     <File Path="$PSRCDIR/sources_1/new/lfsr16.v">
       <FileInfo>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/new/lfsr16.v"/>
-        <Attr Name="ImportTime" Val="1775653018"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -67,8 +55,6 @@
     </File>
     <File Path="$PSRCDIR/sources_1/new/render.v">
       <FileInfo>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/new/render.v"/>
-        <Attr Name="ImportTime" Val="1775702359"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -76,8 +62,6 @@
     </File>
     <File Path="$PSRCDIR/sources_1/new/sin_lut.v">
       <FileInfo>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/new/sin_lut.v"/>
-        <Attr Name="ImportTime" Val="1775653018"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -85,7 +69,7 @@
     </File>
     <File Path="$PSRCDIR/sources_1/new/ss_display.v">
       <FileInfo>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../../../../../../../../../../../../../../../MODS.srcs/sources_1/new/ss_display.v"/>
+        <Attr Name="ImportPath" Val="$PPRDIR/../../../../../../../../../../../../../../MODS.srcs/sources_1/new/ss_display.v"/>
         <Attr Name="ImportTime" Val="1696226948"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
@@ -94,8 +78,6 @@
     </File>
     <File Path="$PSRCDIR/sources_1/new/terrain_ram.v">
       <FileInfo>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/new/terrain_ram.v"/>
-        <Attr Name="ImportTime" Val="1775653018"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -103,8 +85,6 @@
     </File>
     <File Path="$PSRCDIR/sources_1/new/trail_buffer.v">
       <FileInfo>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/new/trail_buffer.v"/>
-        <Attr Name="ImportTime" Val="1775653018"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -112,8 +92,6 @@
     </File>
     <File Path="$PSRCDIR/sources_1/new/main.v">
       <FileInfo>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/new/main.v"/>
-        <Attr Name="ImportTime" Val="1775700732"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -122,8 +100,6 @@
     <File Path="$PSRCDIR/sources_1/new/projectile.v">
       <FileInfo>
         <Attr Name="AutoDisabled" Val="1"/>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/new/projectile.v"/>
-        <Attr Name="ImportTime" Val="1775653018"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -132,8 +108,6 @@
     <File Path="$PSRCDIR/sources_1/new/attack.v">
       <FileInfo>
         <Attr Name="AutoDisabled" Val="1"/>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/new/attack.v"/>
-        <Attr Name="ImportTime" Val="1775653018"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -142,8 +116,6 @@
     <File Path="$PSRCDIR/sources_1/new/map_generation.v">
       <FileInfo>
         <Attr Name="AutoDisabled" Val="1"/>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/new/map_generation.v"/>
-        <Attr Name="ImportTime" Val="1775653018"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
@@ -152,14 +124,11 @@
     <File Path="$PSRCDIR/sources_1/new/stats.v">
       <FileInfo>
         <Attr Name="AutoDisabled" Val="1"/>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../FDP.srcs/sources_1/new/stats.v"/>
-        <Attr Name="ImportTime" Val="1775653018"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>
         <Attr Name="UsedIn" Val="simulation"/>
       </FileInfo>
     </File>
-    <File Path="$PPRDIR/archive_project_summary.txt"/>
     <Config>
       <Option Name="DesignMode" Val="RTL"/>
       <Option Name="TopModule" Val="main"/>
@@ -170,7 +139,7 @@
     <Filter Type="Constrs"/>
     <File Path="$PSRCDIR/constrs_1/new/my_xdc.xdc">
       <FileInfo>
-        <Attr Name="ImportPath" Val="$PPRDIR/../../../../../../../../../../../../../../Module Files/Year 2 Sem 2/EE2026/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc"/>
+        <Attr Name="ImportPath" Val="$PPRDIR/../../../../../../../../../../Module Files/Year 2 Sem 2/EE2026/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc"/>
         <Attr Name="ImportTime" Val="1773173582"/>
         <Attr Name="UsedIn" Val="synthesis"/>
         <Attr Name="UsedIn" Val="implementation"/>

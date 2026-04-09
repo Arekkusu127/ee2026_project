@@ -2,12 +2,12 @@
 # Vivado v2018.2 (64-bit)
 # SW Build 2258646 on Thu Jun 14 20:03:12 MDT 2018
 # IP Build 2256618 on Thu Jun 14 22:10:49 MDT 2018
-# Start of session at: Thu Apr  9 11:40:35 2026
-# Process ID: 4024
-# Current directory: C:/Users/jiayu/Documents/GitHub/FDP/FDP.runs/synth_1
+# Start of session at: Thu Apr  9 10:33:37 2026
+# Process ID: 30836
+# Current directory: D:/2026 group/ee2026_project/FDP/FDP.runs/synth_1
 # Command line: vivado.exe -log main.vds -product Vivado -mode batch -messageDb vivado.pb -notrace -source main.tcl
-# Log file: C:/Users/jiayu/Documents/GitHub/FDP/FDP.runs/synth_1/main.vds
-# Journal file: C:/Users/jiayu/Documents/GitHub/FDP/FDP.runs/synth_1\vivado.jou
+# Log file: D:/2026 group/ee2026_project/FDP/FDP.runs/synth_1/main.vds
+# Journal file: D:/2026 group/ee2026_project/FDP/FDP.runs/synth_1\vivado.jou
 #-----------------------------------------------------------
 source main.tcl -notrace
 Command: synth_design -top main -part xc7a35tcpg236-1
@@ -15,27 +15,27 @@ Starting synth_design
 Attempting to get a license for feature 'Synthesis' and/or device 'xc7a35t'
 INFO: [Common 17-349] Got license for feature 'Synthesis' and/or device 'xc7a35t'
 INFO: Launching helper process for spawning children vivado processes
-INFO: Helper process launched with PID 26608 
-WARNING: [Synth 8-2292] literal value truncated to fit in 6 bits [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:540]
-WARNING: [Synth 8-2292] literal value truncated to fit in 6 bits [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:550]
-WARNING: [Synth 8-2292] literal value truncated to fit in 6 bits [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/trail_buffer.v:40]
-WARNING: [Synth 8-2292] literal value truncated to fit in 6 bits [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/trail_buffer.v:49]
-WARNING: [Synth 8-992] hit_event is already implicitly declared earlier [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/main.v:208]
-WARNING: [Synth 8-992] hit_damage is already implicitly declared earlier [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/main.v:209]
+INFO: Helper process launched with PID 31852 
+WARNING: [Synth 8-2292] literal value truncated to fit in 6 bits [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:540]
+WARNING: [Synth 8-2292] literal value truncated to fit in 6 bits [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:550]
+WARNING: [Synth 8-2292] literal value truncated to fit in 6 bits [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/trail_buffer.v:40]
+WARNING: [Synth 8-2292] literal value truncated to fit in 6 bits [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/trail_buffer.v:49]
+WARNING: [Synth 8-992] hit_event is already implicitly declared earlier [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/main.v:208]
+WARNING: [Synth 8-992] hit_damage is already implicitly declared earlier [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/main.v:209]
 ---------------------------------------------------------------------------------
-Starting RTL Elaboration : Time (s): cpu = 00:00:01 ; elapsed = 00:00:01 . Memory (MB): peak = 368.566 ; gain = 111.648
+Starting RTL Elaboration : Time (s): cpu = 00:00:02 ; elapsed = 00:00:02 . Memory (MB): peak = 369.508 ; gain = 113.113
 ---------------------------------------------------------------------------------
-INFO: [Synth 8-6157] synthesizing module 'main' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/main.v:12]
-INFO: [Synth 8-6157] synthesizing module 'clk_div' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/imports/clk_divider.v:22]
-INFO: [Synth 8-6155] done synthesizing module 'clk_div' (1#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/imports/clk_divider.v:22]
-INFO: [Synth 8-6157] synthesizing module 'debounce' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/debounce.v:23]
-INFO: [Synth 8-6155] done synthesizing module 'debounce' (2#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/debounce.v:23]
-INFO: [Synth 8-6157] synthesizing module 'terrain_ram' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/terrain_ram.v:23]
-INFO: [Synth 8-5534] Detected attribute (* ram_style = "block" *) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/terrain_ram.v:33]
-INFO: [Synth 8-6155] done synthesizing module 'terrain_ram' (3#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/terrain_ram.v:23]
-INFO: [Synth 8-6157] synthesizing module 'trail_buffer' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/trail_buffer.v:23]
-INFO: [Synth 8-6155] done synthesizing module 'trail_buffer' (4#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/trail_buffer.v:23]
-INFO: [Synth 8-6157] synthesizing module 'game_state' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:16]
+INFO: [Synth 8-6157] synthesizing module 'main' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/main.v:12]
+INFO: [Synth 8-6157] synthesizing module 'clk_div' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/imports/clk_divider.v:22]
+INFO: [Synth 8-6155] done synthesizing module 'clk_div' (1#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/imports/clk_divider.v:22]
+INFO: [Synth 8-6157] synthesizing module 'debounce' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/debounce.v:23]
+INFO: [Synth 8-6155] done synthesizing module 'debounce' (2#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/debounce.v:23]
+INFO: [Synth 8-6157] synthesizing module 'terrain_ram' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/terrain_ram.v:23]
+INFO: [Synth 8-5534] Detected attribute (* ram_style = "block" *) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/terrain_ram.v:33]
+INFO: [Synth 8-6155] done synthesizing module 'terrain_ram' (3#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/terrain_ram.v:23]
+INFO: [Synth 8-6157] synthesizing module 'trail_buffer' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/trail_buffer.v:23]
+INFO: [Synth 8-6155] done synthesizing module 'trail_buffer' (4#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/trail_buffer.v:23]
+INFO: [Synth 8-6157] synthesizing module 'game_state' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:16]
 	Parameter PH_INIT bound to: 3'b000 
 	Parameter PH_AIM bound to: 3'b001 
 	Parameter PH_FIRE bound to: 3'b010 
@@ -48,22 +48,22 @@ INFO: [Synth 8-6157] synthesizing module 'game_state' [C:/Users/jiayu/Documents/
 	Parameter TYPE_MINION bound to: 2'b01 
 	Parameter TYPE_BOSS bound to: 2'b10 
 	Parameter GRAVITY bound to: 16'sb0000000000011110 
-INFO: [Synth 8-6157] synthesizing module 'lfsr16' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/lfsr16.v:23]
-INFO: [Synth 8-6155] done synthesizing module 'lfsr16' (5#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/lfsr16.v:23]
-INFO: [Synth 8-6157] synthesizing module 'sin_lut' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/sin_lut.v:23]
-INFO: [Synth 8-6155] done synthesizing module 'sin_lut' (6#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/sin_lut.v:23]
-INFO: [Synth 8-6157] synthesizing module 'cos_lut' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/cos_lut.v:23]
-INFO: [Synth 8-6155] done synthesizing module 'cos_lut' (7#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/cos_lut.v:23]
-INFO: [Synth 8-226] default block is never used [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:200]
-INFO: [Synth 8-226] default block is never used [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:317]
-INFO: [Synth 8-226] default block is never used [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:321]
-WARNING: [Synth 8-6014] Unused sequential element fire_dir_right_reg was removed.  [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:285]
-WARNING: [Synth 8-6014] Unused sequential element trail_tick_cnt_reg was removed.  [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:298]
-WARNING: [Synth 8-5788] Register terrain_wr_addr_reg in module game_state is has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:324]
-WARNING: [Synth 8-5788] Register terrain_wr_data_reg in module game_state is has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:325]
-WARNING: [Synth 8-5788] Register terrain_rd_addr_a_reg in module game_state is has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:338]
-INFO: [Synth 8-6155] done synthesizing module 'game_state' (8#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:16]
-INFO: [Synth 8-6157] synthesizing module 'render' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/render.v:73]
+INFO: [Synth 8-6157] synthesizing module 'lfsr16' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/lfsr16.v:23]
+INFO: [Synth 8-6155] done synthesizing module 'lfsr16' (5#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/lfsr16.v:23]
+INFO: [Synth 8-6157] synthesizing module 'sin_lut' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/sin_lut.v:23]
+INFO: [Synth 8-6155] done synthesizing module 'sin_lut' (6#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/sin_lut.v:23]
+INFO: [Synth 8-6157] synthesizing module 'cos_lut' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/cos_lut.v:23]
+INFO: [Synth 8-6155] done synthesizing module 'cos_lut' (7#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/cos_lut.v:23]
+INFO: [Synth 8-226] default block is never used [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:200]
+INFO: [Synth 8-226] default block is never used [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:317]
+INFO: [Synth 8-226] default block is never used [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:321]
+WARNING: [Synth 8-6014] Unused sequential element fire_dir_right_reg was removed.  [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:285]
+WARNING: [Synth 8-6014] Unused sequential element trail_tick_cnt_reg was removed.  [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:298]
+WARNING: [Synth 8-5788] Register terrain_wr_addr_reg in module game_state is has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:324]
+WARNING: [Synth 8-5788] Register terrain_wr_data_reg in module game_state is has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:325]
+WARNING: [Synth 8-5788] Register terrain_rd_addr_a_reg in module game_state is has both Set and reset with same priority. This may cause simulation mismatches. Consider rewriting code  [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:338]
+INFO: [Synth 8-6155] done synthesizing module 'game_state' (8#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:16]
+INFO: [Synth 8-6157] synthesizing module 'render' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/render.v:63]
 	Parameter PH_AIM bound to: 3'b001 
 	Parameter PH_MOVE bound to: 3'b111 
 	Parameter PH_GAMEOVER bound to: 3'b110 
@@ -88,16 +88,16 @@ INFO: [Synth 8-6157] synthesizing module 'render' [C:/Users/jiayu/Documents/GitH
 	Parameter AIM_R bound to: 30 - type: integer 
 	Parameter AIM_R_SQ_OUT bound to: 16'b0000001110011000 
 	Parameter AIM_R_SQ_IN bound to: 16'b0000001101001001 
-INFO: [Synth 8-6157] synthesizing module 'background' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/render.v:24]
-INFO: [Synth 8-3876] $readmem data file '../../FDP.srcs/sources_1/new/bg_rom0.bin' is read successfully [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/render.v:39]
-INFO: [Synth 8-3876] $readmem data file '../../FDP.srcs/sources_1/new/bg_rom1.bin' is read successfully [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/render.v:40]
-INFO: [Synth 8-3876] $readmem data file '../../FDP.srcs/sources_1/new/bg_rom2.bin' is read successfully [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/render.v:41]
-INFO: [Synth 8-6155] done synthesizing module 'background' (9#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/render.v:24]
-INFO: [Synth 8-6157] synthesizing module 'girl' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/render.v:2]
-INFO: [Synth 8-3876] $readmem data file '../../FDP.srcs/sources_1/new/girl.bin' is read successfully [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/render.v:12]
-INFO: [Synth 8-6155] done synthesizing module 'girl' (10#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/render.v:2]
-INFO: [Synth 8-6155] done synthesizing module 'render' (11#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/render.v:73]
-INFO: [Synth 8-6157] synthesizing module 'Oled_Display' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/imports/Oled_Display.v:36]
+INFO: [Synth 8-6157] synthesizing module 'background' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/render.v:20]
+INFO: [Synth 8-3876] $readmem data file 'D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/bg_rom0.bin' is read successfully [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/render.v:34]
+INFO: [Synth 8-3876] $readmem data file 'D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/bg_rom1.bin' is read successfully [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/render.v:35]
+INFO: [Synth 8-3876] $readmem data file 'D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/bg_rom2.bin' is read successfully [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/render.v:36]
+INFO: [Synth 8-6155] done synthesizing module 'background' (9#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/render.v:20]
+INFO: [Synth 8-6157] synthesizing module 'girl' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/render.v:2]
+INFO: [Synth 8-3876] $readmem data file 'D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/girl.bin' is read successfully [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/render.v:11]
+INFO: [Synth 8-6155] done synthesizing module 'girl' (10#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/render.v:2]
+INFO: [Synth 8-6155] done synthesizing module 'render' (11#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/render.v:63]
+INFO: [Synth 8-6157] synthesizing module 'Oled_Display' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/imports/Oled_Display.v:36]
 	Parameter Width bound to: 96 - type: integer 
 	Parameter Height bound to: 64 - type: integer 
 	Parameter PixelCount bound to: 6144 - type: integer 
@@ -148,16 +148,16 @@ INFO: [Synth 8-6157] synthesizing module 'Oled_Display' [C:/Users/jiayu/Document
 	Parameter SendPixel bound to: 5'b10000 
 	Parameter SpiCommandMaxWidth bound to: 40 - type: integer 
 	Parameter SpiCommandBitCountWidth bound to: 6 - type: integer 
-INFO: [Synth 8-226] default block is never used [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/imports/Oled_Display.v:123]
-INFO: [Synth 8-226] default block is never used [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/imports/Oled_Display.v:198]
-WARNING: [Synth 8-693] zero replication count - replication ignored [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/imports/Oled_Display.v:346]
-INFO: [Synth 8-6155] done synthesizing module 'Oled_Display' (12#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/imports/Oled_Display.v:36]
-INFO: [Synth 8-226] default block is never used [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/main.v:287]
-INFO: [Synth 8-6157] synthesizing module 'ss_display' [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/ss_display.v:22]
-INFO: [Synth 8-226] default block is never used [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/ss_display.v:99]
-INFO: [Synth 8-226] default block is never used [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/ss_display.v:132]
-INFO: [Synth 8-6155] done synthesizing module 'ss_display' (13#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/ss_display.v:22]
-INFO: [Synth 8-6155] done synthesizing module 'main' (14#1) [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/main.v:12]
+INFO: [Synth 8-226] default block is never used [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/imports/Oled_Display.v:123]
+INFO: [Synth 8-226] default block is never used [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/imports/Oled_Display.v:198]
+WARNING: [Synth 8-693] zero replication count - replication ignored [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/imports/Oled_Display.v:346]
+INFO: [Synth 8-6155] done synthesizing module 'Oled_Display' (12#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/imports/Oled_Display.v:36]
+INFO: [Synth 8-226] default block is never used [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/main.v:287]
+INFO: [Synth 8-6157] synthesizing module 'ss_display' [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/ss_display.v:22]
+INFO: [Synth 8-226] default block is never used [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/ss_display.v:99]
+INFO: [Synth 8-226] default block is never used [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/ss_display.v:132]
+INFO: [Synth 8-6155] done synthesizing module 'ss_display' (13#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/ss_display.v:22]
+INFO: [Synth 8-6155] done synthesizing module 'main' (14#1) [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/main.v:12]
 WARNING: [Synth 8-3917] design main has port JC_out[2] driven by constant 0
 WARNING: [Synth 8-3331] design girl has unconnected port game_started
 WARNING: [Synth 8-3331] design render has unconnected port player_entity[45]
@@ -226,7 +226,7 @@ WARNING: [Synth 8-3331] design trail_buffer has unconnected port trail_rd_y[2]
 WARNING: [Synth 8-3331] design trail_buffer has unconnected port trail_rd_y[1]
 WARNING: [Synth 8-3331] design trail_buffer has unconnected port trail_rd_y[0]
 ---------------------------------------------------------------------------------
-Finished RTL Elaboration : Time (s): cpu = 00:00:01 ; elapsed = 00:00:02 . Memory (MB): peak = 436.539 ; gain = 179.621
+Finished RTL Elaboration : Time (s): cpu = 00:00:03 ; elapsed = 00:00:04 . Memory (MB): peak = 436.539 ; gain = 180.145
 ---------------------------------------------------------------------------------
 
 Report Check Netlist: 
@@ -239,57 +239,57 @@ Report Check Netlist:
 Start Handling Custom Attributes
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Handling Custom Attributes : Time (s): cpu = 00:00:02 ; elapsed = 00:00:02 . Memory (MB): peak = 436.539 ; gain = 179.621
+Finished Handling Custom Attributes : Time (s): cpu = 00:00:03 ; elapsed = 00:00:04 . Memory (MB): peak = 436.539 ; gain = 180.145
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished RTL Optimization Phase 1 : Time (s): cpu = 00:00:02 ; elapsed = 00:00:02 . Memory (MB): peak = 436.539 ; gain = 179.621
+Finished RTL Optimization Phase 1 : Time (s): cpu = 00:00:03 ; elapsed = 00:00:04 . Memory (MB): peak = 436.539 ; gain = 180.145
 ---------------------------------------------------------------------------------
 INFO: [Device 21-403] Loading part xc7a35tcpg236-1
 INFO: [Project 1-570] Preparing netlist for logic optimization
 
 Processing XDC Constraints
 Initializing timing engine
-Parsing XDC File [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc]
-Finished Parsing XDC File [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc]
-INFO: [Project 1-236] Implementation specific constraints were found while reading constraint file [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc]. These constraints will be ignored for synthesis but will be used in implementation. Impacted constraints are listed in the file [.Xil/main_propImpl.xdc].
+Parsing XDC File [D:/2026 group/ee2026_project/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc]
+Finished Parsing XDC File [D:/2026 group/ee2026_project/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc]
+INFO: [Project 1-236] Implementation specific constraints were found while reading constraint file [D:/2026 group/ee2026_project/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc]. These constraints will be ignored for synthesis but will be used in implementation. Impacted constraints are listed in the file [.Xil/main_propImpl.xdc].
 Resolution: To avoid this warning, move constraints listed in [.Xil/main_propImpl.xdc] to another XDC file and exclude this new file from synthesis with the used_in_synthesis property (File Properties dialog in GUI) and re-run elaboration/synthesis.
 Completed Processing XDC Constraints
 
 INFO: [Project 1-111] Unisim Transformation Summary:
 No Unisim elements were transformed.
 
-Constraint Validation Runtime : Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.002 . Memory (MB): peak = 783.676 ; gain = 0.000
+Constraint Validation Runtime : Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.003 . Memory (MB): peak = 783.391 ; gain = 0.000
 ---------------------------------------------------------------------------------
-Finished Constraint Validation : Time (s): cpu = 00:00:07 ; elapsed = 00:00:09 . Memory (MB): peak = 783.676 ; gain = 526.758
+Finished Constraint Validation : Time (s): cpu = 00:00:12 ; elapsed = 00:00:14 . Memory (MB): peak = 783.391 ; gain = 526.996
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Loading Part and Timing Information
 ---------------------------------------------------------------------------------
 Loading part: xc7a35tcpg236-1
 ---------------------------------------------------------------------------------
-Finished Loading Part and Timing Information : Time (s): cpu = 00:00:07 ; elapsed = 00:00:09 . Memory (MB): peak = 783.676 ; gain = 526.758
+Finished Loading Part and Timing Information : Time (s): cpu = 00:00:12 ; elapsed = 00:00:14 . Memory (MB): peak = 783.391 ; gain = 526.996
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Applying 'set_property' XDC Constraints
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished applying 'set_property' XDC Constraints : Time (s): cpu = 00:00:07 ; elapsed = 00:00:09 . Memory (MB): peak = 783.676 ; gain = 526.758
+Finished applying 'set_property' XDC Constraints : Time (s): cpu = 00:00:12 ; elapsed = 00:00:14 . Memory (MB): peak = 783.391 ; gain = 526.996
 ---------------------------------------------------------------------------------
 INFO: [Synth 8-5544] ROM "clk_25" won't be mapped to Block RAM because address size (2) smaller than threshold (5)
 INFO: [Synth 8-5544] ROM "clk_6p25" won't be mapped to Block RAM because address size (4) smaller than threshold (5)
 INFO: [Synth 8-5546] ROM "state" won't be mapped to RAM because it is too sparse
-INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:398]
-INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:231]
-INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:433]
-INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:435]
-INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:231]
-INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:230]
-INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:231]
-INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:230]
-INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:230]
-INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:231]
-INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:230]
-INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <unary minus> is shared. To prevent sharing consider applying a KEEP on the output of the operator [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:487]
+INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:398]
+INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:231]
+INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:433]
+INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:435]
+INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:231]
+INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:230]
+INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:231]
+INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:230]
+INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:230]
+INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:231]
+INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <adder> is shared. To prevent sharing consider applying a KEEP on the output of the operator [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:230]
+INFO: [Synth 8-5818] HDL ADVISOR - The operator resource <unary minus> is shared. To prevent sharing consider applying a KEEP on the output of the operator [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:487]
 INFO: [Synth 8-5546] ROM "enemy_alive" won't be mapped to RAM because it is too sparse
 INFO: [Synth 8-5546] ROM "enemy_alive" won't be mapped to RAM because it is too sparse
 INFO: [Synth 8-5546] ROM "enemy_alive" won't be mapped to RAM because it is too sparse
@@ -370,7 +370,7 @@ INFO: [Synth 8-3354] encoded FSM with state register 'move_step_reg' using encod
 ---------------------------------------------------------------------------------------------------
 INFO: [Synth 8-3354] encoded FSM with state register 'state_reg' using encoding 'one-hot' in module 'Oled_Display'
 ---------------------------------------------------------------------------------
-Finished RTL Optimization Phase 2 : Time (s): cpu = 00:00:08 ; elapsed = 00:00:10 . Memory (MB): peak = 783.676 ; gain = 526.758
+Finished RTL Optimization Phase 2 : Time (s): cpu = 00:00:14 ; elapsed = 00:00:17 . Memory (MB): peak = 783.391 ; gain = 526.996
 ---------------------------------------------------------------------------------
 
 Report RTL Partitions: 
@@ -705,7 +705,7 @@ DSP Report: Generating DSP dot_dx_raw, operation Mode is: A*B.
 DSP Report: operator dot_dx_raw is absorbed into DSP dot_dx_raw.
 DSP Report: Generating DSP dot_dy_raw, operation Mode is: A*B.
 DSP Report: operator dot_dy_raw is absorbed into DSP dot_dy_raw.
-WARNING: [Synth 8-6014] Unused sequential element clk_div_inst/clk_25_reg was removed.  [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/imports/clk_divider.v:34]
+WARNING: [Synth 8-6014] Unused sequential element clk_div_inst/clk_25_reg was removed.  [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/imports/clk_divider.v:34]
 INFO: [Synth 8-5546] ROM "oled_inst/fsm_next_state0" won't be mapped to RAM because it is too sparse
 INFO: [Synth 8-5544] ROM "seg_inst/rem11" won't be mapped to Block RAM because address size (3) smaller than threshold (5)
 INFO: [Synth 8-5546] ROM "db_fire/state" won't be mapped to RAM because it is too sparse
@@ -901,7 +901,7 @@ WARNING: [Synth 8-3332] Sequential element (ai_angle_reg[5]) is unused and will 
 WARNING: [Synth 8-3332] Sequential element (clk_div_inst/cnt25_reg[1]) is unused and will be removed from module main.
 WARNING: [Synth 8-3332] Sequential element (clk_div_inst/cnt25_reg[0]) is unused and will be removed from module main.
 ---------------------------------------------------------------------------------
-Finished Cross Boundary and Area Optimization : Time (s): cpu = 00:00:55 ; elapsed = 00:00:58 . Memory (MB): peak = 1107.574 ; gain = 850.656
+Finished Cross Boundary and Area Optimization : Time (s): cpu = 00:01:38 ; elapsed = 00:01:41 . Memory (MB): peak = 1102.582 ; gain = 846.188
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start ROM, RAM, DSP and Shift Register Reporting
@@ -953,13 +953,13 @@ Report RTL Partitions:
 Start Applying XDC Timing Constraints
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Applying XDC Timing Constraints : Time (s): cpu = 00:01:02 ; elapsed = 00:01:06 . Memory (MB): peak = 1107.574 ; gain = 850.656
+Finished Applying XDC Timing Constraints : Time (s): cpu = 00:01:50 ; elapsed = 00:01:54 . Memory (MB): peak = 1102.582 ; gain = 846.188
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Timing Optimization
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Timing Optimization : Time (s): cpu = 00:01:06 ; elapsed = 00:01:11 . Memory (MB): peak = 1107.574 ; gain = 850.656
+Finished Timing Optimization : Time (s): cpu = 00:01:59 ; elapsed = 00:02:03 . Memory (MB): peak = 1102.582 ; gain = 846.188
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start ROM, RAM, DSP and Shift Register Reporting
@@ -979,11 +979,11 @@ Report RTL Partitions:
 ---------------------------------------------------------------------------------
 Start Technology Mapping
 ---------------------------------------------------------------------------------
-INFO: [Synth 8-5844] Detected registers with asynchronous reset at DSP/BRAM block boundary. Consider using synchronous reset for optimal packing [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:262]
-INFO: [Synth 8-5844] Detected registers with asynchronous reset at DSP/BRAM block boundary. Consider using synchronous reset for optimal packing [C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v:262]
+INFO: [Synth 8-5844] Detected registers with asynchronous reset at DSP/BRAM block boundary. Consider using synchronous reset for optimal packing [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:262]
+INFO: [Synth 8-5844] Detected registers with asynchronous reset at DSP/BRAM block boundary. Consider using synchronous reset for optimal packing [D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v:262]
 INFO: [Synth 8-4480] The timing for the instance terrain_inst/mem_reg_1 (implemented as a block RAM) might be sub-optimal as no optional output register could be merged into the block ram. Providing additional output register may help in improving timing.
 ---------------------------------------------------------------------------------
-Finished Technology Mapping : Time (s): cpu = 00:01:08 ; elapsed = 00:01:12 . Memory (MB): peak = 1107.574 ; gain = 850.656
+Finished Technology Mapping : Time (s): cpu = 00:02:02 ; elapsed = 00:02:06 . Memory (MB): peak = 1102.582 ; gain = 846.188
 ---------------------------------------------------------------------------------
 
 Report RTL Partitions: 
@@ -1007,7 +1007,7 @@ Start Final Netlist Cleanup
 Finished Final Netlist Cleanup
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished IO Insertion : Time (s): cpu = 00:01:08 ; elapsed = 00:01:13 . Memory (MB): peak = 1107.574 ; gain = 850.656
+Finished IO Insertion : Time (s): cpu = 00:02:03 ; elapsed = 00:02:07 . Memory (MB): peak = 1102.582 ; gain = 846.188
 ---------------------------------------------------------------------------------
 
 Report Check Netlist: 
@@ -1020,7 +1020,7 @@ Report Check Netlist:
 Start Renaming Generated Instances
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Renaming Generated Instances : Time (s): cpu = 00:01:08 ; elapsed = 00:01:13 . Memory (MB): peak = 1107.574 ; gain = 850.656
+Finished Renaming Generated Instances : Time (s): cpu = 00:02:03 ; elapsed = 00:02:07 . Memory (MB): peak = 1102.582 ; gain = 846.188
 ---------------------------------------------------------------------------------
 
 Report RTL Partitions: 
@@ -1032,25 +1032,25 @@ Report RTL Partitions:
 Start Rebuilding User Hierarchy
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Rebuilding User Hierarchy : Time (s): cpu = 00:01:09 ; elapsed = 00:01:13 . Memory (MB): peak = 1107.574 ; gain = 850.656
+Finished Rebuilding User Hierarchy : Time (s): cpu = 00:02:04 ; elapsed = 00:02:08 . Memory (MB): peak = 1102.582 ; gain = 846.188
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Renaming Generated Ports
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Renaming Generated Ports : Time (s): cpu = 00:01:09 ; elapsed = 00:01:13 . Memory (MB): peak = 1107.574 ; gain = 850.656
+Finished Renaming Generated Ports : Time (s): cpu = 00:02:04 ; elapsed = 00:02:08 . Memory (MB): peak = 1102.582 ; gain = 846.188
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Handling Custom Attributes
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Handling Custom Attributes : Time (s): cpu = 00:01:09 ; elapsed = 00:01:13 . Memory (MB): peak = 1107.574 ; gain = 850.656
+Finished Handling Custom Attributes : Time (s): cpu = 00:02:04 ; elapsed = 00:02:08 . Memory (MB): peak = 1102.582 ; gain = 846.188
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Renaming Generated Nets
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
-Finished Renaming Generated Nets : Time (s): cpu = 00:01:09 ; elapsed = 00:01:13 . Memory (MB): peak = 1107.574 ; gain = 850.656
+Finished Renaming Generated Nets : Time (s): cpu = 00:02:04 ; elapsed = 00:02:08 . Memory (MB): peak = 1102.582 ; gain = 846.188
 ---------------------------------------------------------------------------------
 ---------------------------------------------------------------------------------
 Start Writing Synthesis Report
@@ -1110,11 +1110,11 @@ Report Instance Areas:
 |17    |  terrain_inst |terrain_ram  |    27|
 +------+---------------+-------------+------+
 ---------------------------------------------------------------------------------
-Finished Writing Synthesis Report : Time (s): cpu = 00:01:09 ; elapsed = 00:01:13 . Memory (MB): peak = 1107.574 ; gain = 850.656
+Finished Writing Synthesis Report : Time (s): cpu = 00:02:04 ; elapsed = 00:02:08 . Memory (MB): peak = 1102.582 ; gain = 846.188
 ---------------------------------------------------------------------------------
 Synthesis finished with 0 errors, 0 critical warnings and 81 warnings.
-Synthesis Optimization Runtime : Time (s): cpu = 00:01:04 ; elapsed = 00:01:09 . Memory (MB): peak = 1107.574 ; gain = 503.520
-Synthesis Optimization Complete : Time (s): cpu = 00:01:09 ; elapsed = 00:01:14 . Memory (MB): peak = 1107.574 ; gain = 850.656
+Synthesis Optimization Runtime : Time (s): cpu = 00:01:54 ; elapsed = 00:02:00 . Memory (MB): peak = 1102.582 ; gain = 499.336
+Synthesis Optimization Complete : Time (s): cpu = 00:02:04 ; elapsed = 00:02:08 . Memory (MB): peak = 1102.582 ; gain = 846.188
 INFO: [Project 1-571] Translating synthesized netlist
 INFO: [Netlist 29-17] Analyzing 2584 Unisim elements for replacement
 INFO: [Netlist 29-28] Unisim Transformation completed in 0 CPU seconds
@@ -1128,9 +1128,9 @@ INFO: [Project 1-111] Unisim Transformation Summary:
 INFO: [Common 17-83] Releasing license: Synthesis
 237 Infos, 158 Warnings, 0 Critical Warnings and 0 Errors encountered.
 synth_design completed successfully
-synth_design: Time (s): cpu = 00:01:11 ; elapsed = 00:01:16 . Memory (MB): peak = 1107.574 ; gain = 863.305
+synth_design: Time (s): cpu = 00:02:08 ; elapsed = 00:02:12 . Memory (MB): peak = 1102.582 ; gain = 858.859
 WARNING: [Constraints 18-5210] No constraint will be written out.
-INFO: [Common 17-1381] The checkpoint 'C:/Users/jiayu/Documents/GitHub/FDP/FDP.runs/synth_1/main.dcp' has been generated.
+INFO: [Common 17-1381] The checkpoint 'D:/2026 group/ee2026_project/FDP/FDP.runs/synth_1/main.dcp' has been generated.
 INFO: [runtcl-4] Executing : report_utilization -file main_utilization_synth.rpt -pb main_utilization_synth.pb
-report_utilization: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.026 . Memory (MB): peak = 1107.574 ; gain = 0.000
-INFO: [Common 17-206] Exiting Vivado at Thu Apr  9 11:41:53 2026...
+report_utilization: Time (s): cpu = 00:00:00 ; elapsed = 00:00:00.061 . Memory (MB): peak = 1102.582 ; gain = 0.000
+INFO: [Common 17-206] Exiting Vivado at Thu Apr  9 10:35:55 2026...

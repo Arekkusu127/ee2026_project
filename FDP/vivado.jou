@@ -114,4 +114,3 @@ set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main
 program_hw_devices [get_hw_devices xc7a35t_0]
 refresh_hw_device [lindex [get_hw_devices xc7a35t_0] 0]
 close_hw
-archive_project {D:/2026 group/ee2026_project/FDP.xpr.zip} -temp_dir {D:/2026 group/ee2026_project/FDP/.Xil/Vivado-30920-DESKTOP-QJ09AV3} -force -include_local_ip_cache -include_config_settings

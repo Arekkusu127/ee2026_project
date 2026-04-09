@@ -69,12 +69,12 @@ set rc [catch {
   create_project -in_memory -part xc7a35tcpg236-1
   set_property design_mode GateLvl [current_fileset]
   set_param project.singleFileAddWarning.threshold 0
-  set_property webtalk.parent_dir C:/Users/jiayu/Documents/GitHub/FDP/FDP.cache/wt [current_project]
-  set_property parent.project_path C:/Users/jiayu/Documents/GitHub/FDP/FDP.xpr [current_project]
-  set_property ip_output_repo C:/Users/jiayu/Documents/GitHub/FDP/FDP.cache/ip [current_project]
+  set_property webtalk.parent_dir {D:/2026 group/ee2026_project/FDP/FDP.cache/wt} [current_project]
+  set_property parent.project_path {D:/2026 group/ee2026_project/FDP/FDP.xpr} [current_project]
+  set_property ip_output_repo {{D:/2026 group/ee2026_project/FDP/FDP.cache/ip}} [current_project]
   set_property ip_cache_permissions {read write} [current_project]
-  add_files -quiet C:/Users/jiayu/Documents/GitHub/FDP/FDP.runs/synth_1/main.dcp
-  read_xdc C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc
+  add_files -quiet {{D:/2026 group/ee2026_project/FDP/FDP.runs/synth_1/main.dcp}}
+  read_xdc {{D:/2026 group/ee2026_project/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc}}
   link_design -top main -part xc7a35tcpg236-1
   close_msg_db -file init_design.pb
 } RESULT]

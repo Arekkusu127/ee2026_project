@@ -1,8 +1,8 @@
 Copyright 1986-2018 Xilinx, Inc. All Rights Reserved.
 ------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2018.2 (win64) Build 2258646 Thu Jun 14 20:03:12 MDT 2018
-| Date         : Thu Apr  9 11:42:27 2026
-| Host         : LAPTOP-TX5PRO running 64-bit major release  (build 9200)
+| Date         : Thu Apr  9 10:36:58 2026
+| Host         : DESKTOP-QJ09AV3 running 64-bit major release  (build 9200)
 | Command      : report_control_sets -verbose -file main_control_sets_placed.rpt
 | Design       : main
 | Device       : xc7a35t
@@ -67,29 +67,29 @@ Table of Contents
 +----------------+----------------------------------------+------------------------------------------+------------------+----------------+
 | ~clk_6p25_BUFG |                                        |                                          |                1 |              2 |
 |  clk_IBUF_BUFG |                                        |                                          |                2 |              4 |
-|  clk_IBUF_BUFG | game_fsm/enemy_entity_0[2]_i_1_n_0     | game_fsm/lfsr_inst/AR[0]                 |                2 |              8 |
-|  clk_IBUF_BUFG | game_fsm/player_energy[3]_i_1_n_0      | game_fsm/lfsr_inst/AR[0]                 |                2 |              8 |
+|  clk_IBUF_BUFG | game_fsm/player_power[3]_i_1_n_0       | game_fsm/lfsr_inst/AR[0]                 |                3 |              8 |
 |  clk_IBUF_BUFG | oled_inst/frame_begin                  |                                          |                2 |              8 |
-|  clk_IBUF_BUFG | game_fsm/player_fuel[3]_i_1_n_0        | game_fsm/lfsr_inst/AR[0]                 |                2 |              8 |
 |  clk_IBUF_BUFG | oled_inst/frame_begin                  | render_inst/bg_inst/frame_cnt[7]_i_1_n_0 |                1 |              8 |
 |  clk_IBUF_BUFG | game_fsm/ai_power[3]_i_1_n_0           | game_fsm/lfsr_inst/AR[0]                 |                2 |              8 |
-|  clk_IBUF_BUFG | game_fsm/player_power[3]_i_1_n_0       | game_fsm/lfsr_inst/AR[0]                 |                3 |              8 |
-|  clk_IBUF_BUFG | game_fsm/player_entity[43]_i_1_n_0     | game_fsm/lfsr_inst/AR[0]                 |                2 |             10 |
+|  clk_IBUF_BUFG | game_fsm/enemy_entity_0[2]_i_1_n_0     | game_fsm/lfsr_inst/AR[0]                 |                2 |              8 |
+|  clk_IBUF_BUFG | game_fsm/player_fuel[3]_i_1_n_0        | game_fsm/lfsr_inst/AR[0]                 |                2 |              8 |
+|  clk_IBUF_BUFG | game_fsm/player_energy[3]_i_1_n_0      | game_fsm/lfsr_inst/AR[0]                 |                2 |              8 |
 |  clk_IBUF_BUFG | game_fsm/ai_angle[4]_i_1_n_0           | game_fsm/lfsr_inst/AR[0]                 |                1 |             10 |
 |  clk_IBUF_BUFG | game_fsm/ai_delay[4]_i_1_n_0           | game_fsm/lfsr_inst/AR[0]                 |                1 |             10 |
-|  clk_IBUF_BUFG | game_fsm/enemy_entity_2[12]_i_1_n_0    | game_fsm/lfsr_inst/AR[0]                 |                2 |             12 |
-|  clk_IBUF_BUFG | game_fsm/enemy_entity_0[12]_i_1_n_0    | game_fsm/lfsr_inst/AR[0]                 |                3 |             12 |
-|  clk_IBUF_BUFG | game_fsm/proj_y[5]_i_1_n_0             | game_fsm/lfsr_inst/AR[0]                 |                3 |             12 |
+|  clk_IBUF_BUFG | game_fsm/player_entity[43]_i_1_n_0     | game_fsm/lfsr_inst/AR[0]                 |                2 |             10 |
 |  clk_IBUF_BUFG | game_fsm/player_entity[12]_i_1_n_0     | game_fsm/lfsr_inst/AR[0]                 |                4 |             12 |
+|  clk_IBUF_BUFG | game_fsm/enemy_entity_0[12]_i_1_n_0    | game_fsm/lfsr_inst/AR[0]                 |                3 |             12 |
+|  clk_IBUF_BUFG | game_fsm/enemy_entity_2[12]_i_1_n_0    | game_fsm/lfsr_inst/AR[0]                 |                2 |             12 |
 |  clk_IBUF_BUFG | game_fsm/enemy_entity_1[12]_i_1_n_0    | game_fsm/lfsr_inst/AR[0]                 |                4 |             12 |
+|  clk_IBUF_BUFG | game_fsm/proj_y[5]_i_1_n_0             | game_fsm/lfsr_inst/AR[0]                 |                3 |             12 |
 |  clk_IBUF_BUFG | game_fsm/player_angle[6]_i_1_n_0       | game_fsm/lfsr_inst/AR[0]                 |                3 |             14 |
-|  clk_IBUF_BUFG | game_fsm/move_target_x[6]_i_1_n_0      | game_fsm/lfsr_inst/AR[0]                 |                3 |             14 |
+|  clk_IBUF_BUFG | game_fsm/init_col0                     | game_fsm/lfsr_inst/AR[0]                 |                3 |             14 |
 |  clk_IBUF_BUFG | game_fsm/player_entity[19]_i_1_n_0     | game_fsm/lfsr_inst/AR[0]                 |                5 |             14 |
+|  clk_IBUF_BUFG | game_fsm/move_target_x[6]_i_1_n_0      | game_fsm/lfsr_inst/AR[0]                 |                3 |             14 |
 |  clk_IBUF_BUFG | game_fsm/proj_x[6]_i_1_n_0             | game_fsm/lfsr_inst/AR[0]                 |                3 |             14 |
 |  clk_IBUF_BUFG | game_fsm/terrain_rd_addr_a[6]_i_1_n_0  |                                          |                5 |             14 |
-|  clk_IBUF_BUFG | game_fsm/init_col0                     | game_fsm/lfsr_inst/AR[0]                 |                3 |             14 |
-|  clk_IBUF_BUFG | game_fsm/hit_event                     | sw_IBUF[15]                              |                4 |             16 |
 |  clk_IBUF_BUFG | game_fsm/hit_damage[7]_i_1_n_0         | game_fsm/lfsr_inst/AR[0]                 |                5 |             16 |
+|  clk_IBUF_BUFG | game_fsm/hit_event                     | sw_IBUF[15]                              |                4 |             16 |
 |  clk_IBUF_BUFG | game_fsm/blast_dx[7]_i_1_n_0           | game_fsm/lfsr_inst/AR[0]                 |                4 |             16 |
 |  clk_IBUF_BUFG | game_fsm/real_hp_enemy[0][8]_i_1_n_0   | game_fsm/lfsr_inst/AR[0]                 |                3 |             18 |
 |  clk_IBUF_BUFG | game_fsm/real_hp_enemy[1][8]_i_1_n_0   | game_fsm/lfsr_inst/AR[0]                 |                3 |             18 |

@@ -294,11 +294,3 @@ Resolution:
 For more details on setting the scan chain property, consult the Vivado Debug and Programming User Guide (UG908).
 ERROR: [Labtoolstcl 44-513] HW Target shutdown. Closing target: localhost:3121/xilinx_tcf/Digilent/210183BD3818A
 close_hw
-archive_project {D:/2026 group/ee2026_project/FDP.xpr.zip} -temp_dir {D:/2026 group/ee2026_project/FDP/.Xil/Vivado-30920-DESKTOP-QJ09AV3} -force -include_local_ip_cache -include_config_settings
-INFO: [Coretcl 2-137] starting archive...
-INFO: [Coretcl 2-1499] Saving project copy to temporary location 'D:/2026 group/ee2026_project/FDP/.Xil/Vivado-30920-DESKTOP-QJ09AV3' for archiving project
-Scanning sources...
-Finished scanning sources
-INFO: [Coretcl 2-1211] Creating project copy for archival...
-INFO: [Coretcl 2-1213] Including run results for 'synth_1'
-INFO: [Coretcl 2-1213] Including run results for 'impl_1'
