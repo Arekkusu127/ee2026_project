@@ -1,8 +1,8 @@
 Copyright 1986-2018 Xilinx, Inc. All Rights Reserved.
 --------------------------------------------------------------------------------------------------------------------------------------------------
 | Tool Version : Vivado v.2018.2 (win64) Build 2258646 Thu Jun 14 20:03:12 MDT 2018
-| Date         : Wed Apr  8 20:38:14 2026
-| Host         : LAPTOP-TX5PRO running 64-bit major release  (build 9200)
+| Date         : Thu Apr  9 10:37:42 2026
+| Host         : DESKTOP-QJ09AV3 running 64-bit major release  (build 9200)
 | Command      : report_methodology -file main_methodology_drc_routed.rpt -pb main_methodology_drc_routed.pb -rpx main_methodology_drc_routed.rpx
 | Design       : main
 | Device       : xc7a35tcpg236-1
@@ -23,13 +23,13 @@ Table of Contents
           Floorplan: design_1
       Design limits: <entire design considered>
              Max violations: <unlimited>
-             Violations found: 183
+             Violations found: 182
 +-----------+----------+-----------------------------------------+------------+
 | Rule      | Severity | Description                             | Violations |
 +-----------+----------+-----------------------------------------+------------+
 | DPIR-1    | Warning  | Asynchronous driver check               | 9          |
 | LUTAR-1   | Warning  | LUT drives async reset alert            | 1          |
-| SYNTH-4   | Warning  | Shallow depth for a dedicated block RAM | 2          |
+| SYNTH-4   | Warning  | Shallow depth for a dedicated block RAM | 1          |
 | TIMING-17 | Warning  | Non-clocked sequential cell             | 115        |
 | TIMING-18 | Warning  | Missing input or output delay           | 56         |
 +-----------+----------+-----------------------------------------+------------+
@@ -83,17 +83,12 @@ Related violations: <none>
 
 LUTAR-1#1 Warning
 LUT drives async reset alert  
-LUT cell game_fsm/lfsr_inst/FSM_sequential_move_step[1]_i_2, with 2 or more inputs, drives asynchronous preset/clear pin(s) game_fsm/FSM_sequential_move_step_reg[0]/CLR, game_fsm/FSM_sequential_move_step_reg[1]/CLR, game_fsm/ai_angle_reg[1]/CLR, game_fsm/ai_angle_reg[4]/CLR, game_fsm/ai_delay_reg[0]/CLR, game_fsm/ai_delay_reg[1]/CLR, game_fsm/ai_delay_reg[2]/CLR, game_fsm/ai_delay_reg[3]/CLR, game_fsm/ai_delay_reg[4]/CLR, game_fsm/ai_power_reg[3]/CLR, game_fsm/anim_ticks_reg[0]/CLR, game_fsm/anim_ticks_reg[1]/CLR, game_fsm/anim_ticks_reg[2]/CLR, game_fsm/anim_ticks_reg[3]/CLR, game_fsm/anim_ticks_reg[4]/CLR (the first 15 of 327 listed). The LUT may glitch and trigger an unexpected reset, even if it is a properly timed path.
+LUT cell game_fsm/lfsr_inst/FSM_sequential_move_step[1]_i_2, with 2 or more inputs, drives asynchronous preset/clear pin(s) game_fsm/FSM_sequential_move_step_reg[0]/CLR, game_fsm/FSM_sequential_move_step_reg[1]/CLR, game_fsm/ai_angle_reg[1]/CLR, game_fsm/ai_angle_reg[4]/CLR, game_fsm/ai_delay_reg[0]/CLR, game_fsm/ai_delay_reg[1]/CLR, game_fsm/ai_delay_reg[2]/CLR, game_fsm/ai_delay_reg[3]/CLR, game_fsm/ai_delay_reg[4]/CLR, game_fsm/ai_power_reg[3]/CLR, game_fsm/anim_ticks_reg[0]/CLR, game_fsm/anim_ticks_reg[1]/CLR, game_fsm/anim_ticks_reg[2]/CLR, game_fsm/anim_ticks_reg[3]/CLR, game_fsm/anim_ticks_reg[4]/CLR (the first 15 of 326 listed). The LUT may glitch and trigger an unexpected reset, even if it is a properly timed path.
 Related violations: <none>
 
 SYNTH-4#1 Warning
 Shallow depth for a dedicated block RAM  
 The instance terrain_inst/mem_reg_1 is implemented as block RAM but is better mapped onto distributed LUT RAM for the following reason: The depth (7 address bits) is shallow. Please use attribute (* ram_style = "distributed" *)  to instruct Vivado to infer distributed LUT RAM.
-Related violations: <none>
-
-SYNTH-4#2 Warning
-Shallow depth for a dedicated block RAM  
-The instance terrain_inst/mem_reg_2 is implemented as block RAM but is better mapped onto distributed LUT RAM for the following reason: The depth (7 address bits) is shallow. Please use attribute (* ram_style = "distributed" *)  to instruct Vivado to infer distributed LUT RAM.
 Related violations: <none>
 
 TIMING-17#1 Warning

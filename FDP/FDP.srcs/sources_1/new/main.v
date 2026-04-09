@@ -209,7 +209,7 @@ module main(
     wire [7:0]  hit_damage;
 
     // ---- OLED pixel pipeline ----
-    wire        frame_begin, sending_pixels, sample_pixel;
+    wire sending_pixels, sample_pixel;
     wire [12:0] pixel_index;
     wire [15:0] pixel_data;
 
@@ -219,6 +219,8 @@ module main(
     assign terrain_rd_addr_b = pix_x;
 
     render render_inst (
+        .CLOCK(clk),
+        .frame_begin(frame_begin),
         .pix_x(pix_x),
         .pix_y(pix_y),
         .game_started(game_started),
