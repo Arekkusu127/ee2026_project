@@ -1,4 +1,23 @@
 `timescale 1ns / 1ps
+module boss(
+    input frame_begin,
+    input [5:0] x_pos,
+    input [5:0] y_pos,
+    output  [15:0] pixel,
+    output visible
+);
+    reg [15:0] rom [0:1999];
+    initial begin
+        $readmemb("D:/FDP/FDP.srcs/sources_1/new/boss.bin", rom);
+    end
+    wire [10:0] addr = y_pos * 40 + x_pos; // 40 pixels per row
+    assign pixel = rom[addr];
+    wire [4:0] r = pixel[15:11];
+    wire [5:0] g = pixel[10:5];
+    wire [4:0] b = pixel[4:0];
+    assign visible = !( (r >= 28) && (g >= 45) && (g <= 55) && (b >= 28) );
+
+endmodule
 
 module girl(
     input game_started,
@@ -70,6 +89,8 @@ endmodule
 module render(
     input         CLOCK,
     input         frame_begin,
+    input boss_attack_active,
+    input [6:0] boss_attack_x,
     input  [6:0]  pix_x,
     input  [5:0]  pix_y,
     input         game_started,
@@ -263,6 +284,35 @@ module render(
         .visible(girl_vis)
     );
 
+    wire boss_phase = current_round && enemy_alive[0] && (enemy_entity_0 != 46'd0);
+
+    // fixed boss sprite position
+    wire [6:0] boss_left = 7'd55;
+    wire [5:0] boss_top  = 6'd7;
+
+    wire in_boss = boss_phase &&
+                (pix_x >= boss_left) && (pix_x < boss_left + 7'd40) &&
+                (pix_y >= boss_top)  && (pix_y < boss_top + 6'd50);
+
+    wire [5:0] local_xb = pix_x[5:0] - boss_left[5:0];
+    wire [5:0] local_yb = pix_y - boss_top;
+
+    wire [15:0] boss_pixel;
+    wire boss_vis;
+
+    boss boss_inst(
+        .frame_begin(frame_begin),
+        .x_pos(local_xb),
+        .y_pos(local_yb),
+        .pixel(boss_pixel),
+        .visible(boss_vis)
+    );
+
+    // full-screen vertical red beam
+    wire boss_beam_hit = boss_attack_active &&
+                        (pix_x >= boss_attack_x) &&
+                        (pix_x <= boss_attack_x + 7'd1);
+
     wire enemy0_vis = (enemy_entity_0 != 46'd0);
     wire enemy0_hit = enemy0_vis &&
                       (ex0 >= {3'd0, ehw0}) && (ey0 >= {3'd0, ehh0}) &&
@@ -284,7 +334,11 @@ module render(
                       (pix_x >= ex2 - {3'd0, ehw2}) && (pix_x <= ex2 + {3'd0, ehw2}) &&
                       (pix_y >= ey2 - {3'd0, ehh2}) && (pix_y <= ey2 + {3'd0, ehh2});
     wire [15:0] enemy2_color = !enemy_alive[2] ? C_MINION_DEAD : C_MINION;
-
+   
+    wire enemy0_vis = !boss_phase && (enemy_entity_0 != 46'd0);//enemy disappears during boss phase
+    wire enemy1_vis = !boss_phase && !current_round && (enemy_entity_1 != 46'd0);
+    wire enemy2_vis = !boss_phase && !current_round && (enemy_entity_2 != 46'd0);
+   
     wire proj_hit = proj_active &&
                     (pix_x >= proj_x) && (pix_x <= proj_x + 7'd1) &&
                     (pix_y >= proj_y) && (pix_y <= proj_y + 6'd1);
@@ -300,34 +354,38 @@ module render(
     // ============================================================
     // PRIORITY MUX
     // ============================================================
-    always @(*) begin
-        if (!game_started) begin
-            pixel_data = bg_pixel;
-        end
-        else if (gameover_banner)
-            pixel_data = victory ? C_VICTORY : C_DEFEAT;
-        else if (reticle_hit)
-            pixel_data = C_RETICLE;
-        else if (proj_hit)
-            pixel_data = C_PROJ;
-        else if (player_hp_filled || e0_hp_filled || e1_hp_filled || e2_hp_filled)
-            pixel_data = C_HP_FILL;
-        else if (player_hp_bar_region || e0_hp_bar_region || e1_hp_bar_region || e2_hp_bar_region)
-            pixel_data = C_HP_EMPTY;
-        else if (in_girl && girl_vis)
-            pixel_data = girl_pixel;
-        else if (enemy0_hit)
-            pixel_data = enemy0_color;
-        else if (enemy1_hit)
-            pixel_data = enemy1_color;
-        else if (enemy2_hit)
-            pixel_data = enemy2_color;
-        else if (arc_dotted)
-            pixel_data = C_ARC_PREVIEW;
-        else if (trail_dotted)
-            pixel_data = C_TRAIL;
-        else
-            pixel_data = bg_pixel;  // Background shows through - no terrain
+always @(*) begin
+    if (!game_started) begin
+        pixel_data = bg_pixel;
     end
+    else if (gameover_banner)
+        pixel_data = victory ? C_VICTORY : C_DEFEAT;
+    else if (boss_beam_hit)
+        pixel_data = 16'hF800;
+    else if (aim_dot_hit)
+        pixel_data = C_AIM_DOT;
+    else if (aim_circle_outline)
+        pixel_data = C_AIM_CIRCLE;
+    else if (proj_hit)
+        pixel_data = C_PROJ;
+    else if (player_hp_filled || e0_hp_filled || e1_hp_filled || e2_hp_filled)
+        pixel_data = C_HP_FILL;
+    else if (player_hp_bar_region || e0_hp_bar_region || e1_hp_bar_region || e2_hp_bar_region)
+        pixel_data = C_HP_EMPTY;
+    else if (in_girl && girl_vis)
+        pixel_data = girl_pixel;
+    else if (in_boss && boss_vis)
+        pixel_data = boss_pixel;
+    else if (enemy0_hit)
+        pixel_data = enemy0_color;
+    else if (enemy1_hit)
+        pixel_data = enemy1_color;
+    else if (enemy2_hit)
+        pixel_data = enemy2_color;
+    else if (trail_dotted)
+        pixel_data = C_TRAIL;
+    else
+        pixel_data = bg_pixel;
+end
 
 endmodule
