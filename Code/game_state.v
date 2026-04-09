@@ -127,6 +127,12 @@ module game_state(
 
     reg [8:0] real_hp_player;
     reg [8:0] real_hp_enemy [0:2];
+    reg [8:0] next_player_hp;
+    reg [8:0] next_enemy_hp0;
+    reg [8:0] next_enemy_hp1;
+    reg [8:0] next_enemy_hp2;
+    reg [2:0] next_enemy_alive;
+    reg [5:0] enemy_attack_damage;
 
     // ---- Projectile physics (fixed point: 8 fractional bits) ----
     reg signed [20:0] proj_fx, proj_fy;
@@ -453,7 +459,7 @@ module game_state(
 
                         // Write pixel if in bounds
                         if (!arc_fx[20] && arc_fx[14:8] < 7'd96 &&
-                            !arc_fy[20] && arc_fy[13:8] < 6'd64) begin
+                            !arc_fy[20] && arc_fy[13:8] < 7'd64) begin
                             // Write every other step for dotted look
                             if (arc_step[1:0] == 2'b00) begin
                                 arc_wr_en <= 1;
@@ -770,13 +776,13 @@ module game_state(
 
                     if (!proj_fx[20] && proj_fx[14:8] < 7'd96)
                         proj_x <= proj_fx[14:8];
-                    if (!proj_fy[20] && proj_fy[13:8] < 6'd64)
+                    if (!proj_fy[20] && proj_fy[13:8] < 7'd64)
                         proj_y <= proj_fy[13:8];
 
                     trail_tick_cnt <= trail_tick_cnt + 1;
                     if (trail_tick_cnt[0] == 1'b0) begin
                         if (!proj_fx[20] && proj_fx[14:8] < 7'd96 &&
-                            !proj_fy[20] && proj_fy[13:8] < 6'd64) begin
+                            !proj_fy[20] && proj_fy[13:8] < 7'd64) begin
                             trail_wr_en <= 1;
                             trail_wr_x  <= proj_fx[14:8];
                             trail_wr_y  <= proj_fy[13:8];
@@ -830,100 +836,143 @@ module game_state(
             PH_RESOLVE: begin
                 case (resolve_step)
                 3'd0: begin
+                    next_player_hp   = real_hp_player;
+                    next_enemy_hp0   = real_hp_enemy[0];
+                    next_enemy_hp1   = real_hp_enemy[1];
+                    next_enemy_hp2   = real_hp_enemy[2];
+                    next_enemy_alive = enemy_alive;
+                    enemy_attack_damage = 6'd15;
+
+                    if (!is_player_turn && !current_round) begin
+                        case (current_enemy_idx)
+                            2'd0: enemy_attack_damage = ent_atk(enemy_entity_0);
+                            2'd1: enemy_attack_damage = ent_atk(enemy_entity_1);
+                            2'd2: enemy_attack_damage = ent_atk(enemy_entity_2);
+                            default: enemy_attack_damage = 6'd15;
+                        endcase
+                    end
+
                     if (is_player_turn) begin
-                        // Player attacks the enemies
-                        if (enemy_alive[0] && manhattan(proj_x, proj_y, ent_px(enemy_entity_0), ent_py(enemy_entity_0)) <= {4'd0, skill_blast}) begin
-                            if (real_hp_enemy[0] <= {3'd0, skill_damage}) begin
-                                real_hp_enemy[0] <= 9'd0;
-                                enemy_alive[0]   <= 1'b0;  // Mark enemy 0 as dead
-                                hit_event         <= 1'b1;
-                                hit_damage        <= {2'd0, real_hp_enemy[0][5:0]};
+                        // Player attacks enemies
+                        if (enemy_alive[0] &&
+                            manhattan(proj_x, proj_y, ent_px(enemy_entity_0), ent_py(enemy_entity_0)) <= {4'd0, skill_blast}) begin
+                            if (next_enemy_hp0 <= {3'd0, skill_damage}) begin
+                                hit_event           <= 1'b1;
+                                hit_damage          <= next_enemy_hp0[7:0];
+                                next_enemy_hp0      = 9'd0;
+                                next_enemy_alive[0] = 1'b0;
                             end else begin
-                                real_hp_enemy[0] <= real_hp_enemy[0] - {3'd0, skill_damage};
-                                hit_event         <= 1'b1;
-                                hit_damage        <= {2'd0, skill_damage};
+                                hit_event      <= 1'b1;
+                                hit_damage     <= {2'd0, skill_damage};
+                                next_enemy_hp0 = next_enemy_hp0 - {3'd0, skill_damage};
                             end
                         end
-                        if (enemy_alive[1] && manhattan(proj_x, proj_y, ent_px(enemy_entity_1), ent_py(enemy_entity_1)) <= {4'd0, skill_blast}) begin
-                            if (real_hp_enemy[1] <= {3'd0, skill_damage}) begin
-                                real_hp_enemy[1] <= 9'd0;
-                                enemy_alive[1]   <= 1'b0;  // Mark enemy 1 as dead
-                                hit_event         <= 1'b1;
-                                hit_damage        <= {2'd0, real_hp_enemy[1][5:0]};
+
+                        if (enemy_alive[1] &&
+                            manhattan(proj_x, proj_y, ent_px(enemy_entity_1), ent_py(enemy_entity_1)) <= {4'd0, skill_blast}) begin
+                            if (next_enemy_hp1 <= {3'd0, skill_damage}) begin
+                                hit_event           <= 1'b1;
+                                hit_damage          <= next_enemy_hp1[7:0];
+                                next_enemy_hp1      = 9'd0;
+                                next_enemy_alive[1] = 1'b0;
                             end else begin
-                                real_hp_enemy[1] <= real_hp_enemy[1] - {3'd0, skill_damage};
-                                hit_event         <= 1'b1;
-                                hit_damage        <= {2'd0, skill_damage};
+                                hit_event      <= 1'b1;
+                                hit_damage     <= {2'd0, skill_damage};
+                                next_enemy_hp1 = next_enemy_hp1 - {3'd0, skill_damage};
                             end
                         end
-                        if (enemy_alive[2] && manhattan(proj_x, proj_y, ent_px(enemy_entity_2), ent_py(enemy_entity_2)) <= {4'd0, skill_blast}) begin
-                            if (real_hp_enemy[2] <= {3'd0, skill_damage}) begin
-                                real_hp_enemy[2] <= 9'd0;
-                                enemy_alive[2]   <= 1'b0;  // Mark enemy 2 as dead
-                                hit_event         <= 1'b1;
-                                hit_damage        <= {2'd0, real_hp_enemy[2][5:0]};
+
+                        if (enemy_alive[2] &&
+                            manhattan(proj_x, proj_y, ent_px(enemy_entity_2), ent_py(enemy_entity_2)) <= {4'd0, skill_blast}) begin
+                            if (next_enemy_hp2 <= {3'd0, skill_damage}) begin
+                                hit_event           <= 1'b1;
+                                hit_damage          <= next_enemy_hp2[7:0];
+                                next_enemy_hp2      = 9'd0;
+                                next_enemy_alive[2] = 1'b0;
                             end else begin
-                                real_hp_enemy[2] <= real_hp_enemy[2] - {3'd0, skill_damage};
-                                hit_event         <= 1'b1;
-                                hit_damage        <= {2'd0, skill_damage};
+                                hit_event      <= 1'b1;
+                                hit_damage     <= {2'd0, skill_damage};
+                                next_enemy_hp2 = next_enemy_hp2 - {3'd0, skill_damage};
                             end
                         end
-                    end else begin
-                        // Boss's turn to attack the player
-                        if (current_round) begin
-                            // Boss attack - deduct 50 HP from player's health
-                            if (manhattan(proj_x, proj_y, ent_px(player_entity), ent_py(player_entity)) <= 8'd5) begin
-                                if (real_hp_player <= 9'd50) begin
-                                    hit_event         <= 1'b1;
-                                    hit_damage        <= real_hp_player[7:0];  // Deduct remaining HP
-                                    real_hp_player    <= 9'd0;
-                                end else begin
-                                    real_hp_player    <= real_hp_player - 9'd50;  // Deduct 50 HP
-                                    hit_event         <= 1'b1;
-                                    hit_damage        <= 8'd50;
-                                end
+                    end
+                    else if (current_round) begin
+                        // Boss beam attack uses boss_attack_x, not proj_x/proj_y
+                        if ((boss_attack_x <= ent_px(player_entity) + {3'd0, ent_hw(player_entity)}) &&
+                            (boss_attack_x + 7'd1 >= ent_px(player_entity) - {3'd0, ent_hw(player_entity)})) begin
+                            if (next_player_hp <= 9'd50) begin
+                                hit_event      <= 1'b1;
+                                hit_damage     <= next_player_hp[7:0];
+                                next_player_hp = 9'd0;
+                            end else begin
+                                hit_event      <= 1'b1;
+                                hit_damage     <= 8'd50;
+                                next_player_hp = next_player_hp - 9'd50;
+                            end
+                        end
+                    end
+                    else begin
+                        // Minion projectile damage to player
+                        if (manhattan(proj_x, proj_y, ent_px(player_entity), ent_py(player_entity)) <= 8'd5) begin
+                            if (next_player_hp <= {3'd0, enemy_attack_damage}) begin
+                                hit_event      <= 1'b1;
+                                hit_damage     <= next_player_hp[7:0];
+                                next_player_hp = 9'd0;
+                            end else begin
+                                hit_event      <= 1'b1;
+                                hit_damage     <= {2'd0, enemy_attack_damage};
+                                next_player_hp = next_player_hp - {3'd0, enemy_attack_damage};
                             end
                         end
                     end
 
-                    // Check if any enemies have died
-                    if (real_hp_enemy[0] == 9'd0) enemy_alive[0] <= 1'b0;
-                    if (real_hp_enemy[1] == 9'd0) enemy_alive[1] <= 1'b0;
-                    if (real_hp_enemy[2] == 9'd0) enemy_alive[2] <= 1'b0;
+                    real_hp_player    <= next_player_hp;
+                    real_hp_enemy[0]  <= next_enemy_hp0;
+                    real_hp_enemy[1]  <= next_enemy_hp1;
+                    real_hp_enemy[2]  <= next_enemy_hp2;
+                    enemy_alive       <= next_enemy_alive;
 
-                    // Update player and enemy HP after attacks
-                    player_entity <= set_hp(player_entity, (real_hp_player[8:2] > 6'd63) ? 6'd63 : real_hp_player[8:2]);
-                    enemy_entity_0 <= set_hp(enemy_entity_0, (real_hp_enemy[0] > 9'd63) ? 6'd63 : real_hp_enemy[0][5:0]);
-                    enemy_entity_1 <= set_hp(enemy_entity_1, (real_hp_enemy[1] > 9'd63) ? 6'd63 : real_hp_enemy[1][5:0]);
-                    enemy_entity_2 <= set_hp(enemy_entity_2, (real_hp_enemy[2] > 9'd63) ? 6'd63 : real_hp_enemy[2][5:0]);
+                    player_entity  <= set_hp(player_entity,
+                        (next_player_hp[8:2] > 6'd63) ? 6'd63 : next_player_hp[8:2]);
+                    enemy_entity_0 <= set_hp(enemy_entity_0,
+                        (next_enemy_hp0 > 9'd63) ? 6'd63 : next_enemy_hp0[5:0]);
+                    enemy_entity_1 <= set_hp(enemy_entity_1,
+                        (next_enemy_hp1 > 9'd63) ? 6'd63 : next_enemy_hp1[5:0]);
+                    enemy_entity_2 <= set_hp(enemy_entity_2,
+                        (next_enemy_hp2 > 9'd63) ? 6'd63 : next_enemy_hp2[5:0]);
 
-                    // Handle game transitions based on health
-                    if (real_hp_player == 9'd0) begin
-                        defeat <= 1'b1;  // Player lost
+                    if (next_player_hp == 9'd0) begin
+                        defeat     <= 1'b1;
                         game_phase <= PH_GAMEOVER;
-                    end else if (enemy_alive == 3'b000) begin
+                    end
+                    else if (next_enemy_alive == 3'b000) begin
                         if (!current_round) begin
-                            current_round <= 1'b1;
-                            player_energy <= 4'd12;
-                            player_entity[25:20] <= 6'd12;  // Reset player energy and stats for next round
+                            current_round     <= 1'b1;
+                            player_energy     <= 4'd12;
+                            is_player_turn    <= 1'b1;
+                            current_enemy_idx <= 2'd0;
+                            player_fuel       <= 4'd10;
 
-                            // Spawn the boss
-                            enemy_entity_0 <= pack_entity(TYPE_BOSS, 6'd150, 6'd30, 6'd40, 6'd0, 7'd80, 6'd0, 4'd5, 3'd4);
-                            enemy_entity_1 <= 46'd0;
-                            enemy_entity_2 <= 46'd0;
-                            real_hp_enemy[0] <= 9'd400;
-                            real_hp_enemy[1] <= 9'd0;
-                            real_hp_enemy[2] <= 9'd0;
-                            enemy_alive <= 3'b001;  // Only the boss is alive now
+                            // Spawn boss directly at a visible place
+                            enemy_entity_0    <= pack_entity(TYPE_BOSS, 6'd63, 6'd30, 6'd40, 6'd0,
+                                                             7'd75, 6'd38, 4'd5, 3'd4);
+                            enemy_entity_1    <= 46'd0;
+                            enemy_entity_2    <= 46'd0;
+                            real_hp_enemy[0]  <= 9'd400;
+                            real_hp_enemy[1]  <= 9'd0;
+                            real_hp_enemy[2]  <= 9'd0;
+                            enemy_alive       <= 3'b001;
 
-                            game_phase <= PH_MOVE;  // Start new round with boss
+                            game_phase        <= PH_MOVE;
                         end else begin
-                            victory <= 1'b1;  // Player wins after boss defeat
+                            victory    <= 1'b1;
                             game_phase <= PH_GAMEOVER;
                         end
-                    end else begin
-                        game_phase <= PH_NEXTTURN;  // Continue to the next round if there are still enemies
                     end
+                    else begin
+                        game_phase <= PH_NEXTTURN;
+                    end
+
                     resolve_step <= 0;
                 end
                 default: resolve_step <= 3'd0;

@@ -96,6 +96,8 @@ module main(
     wire        terrain_wr_en;
     wire [6:0]  terrain_wr_addr;
     wire [5:0]  terrain_wr_data;
+    wire  boss_attack_active;
+    wire [6:0] boss_attack_x;
 
     terrain_ram terrain_inst (
         .clk(clk),
@@ -223,7 +225,9 @@ module main(
         .hit_event(hit_event),
         .hit_damage(hit_damage),
         .reticle_x(reticle_x),
-        .reticle_y(reticle_y)
+        .reticle_y(reticle_y),
+        .boss_attack_active(boss_attack_active),
+        .boss_attack_x(boss_attack_x)
     );
 
     // ---- OLED pixel pipeline ----
@@ -240,6 +244,8 @@ module main(
     render render_inst (
         .CLOCK(clk),
         .frame_begin(frame_begin),
+        .boss_attack_active(boss_attack_active),
+        .boss_attack_x(boss_attack_x),
         .pix_x(pix_x),
         .pix_y(pix_y),
         .game_started(game_started),
