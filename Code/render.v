@@ -447,8 +447,11 @@ module render(
         else if (proj_hit) begin
             pixel_data = C_PROJ;
         end
-        else if (player_hp_filled || boss_hp_filled || slime0_hp_filled || slime1_hp_filled) begin
+        else if (player_hp_filled) begin
             pixel_data = C_HP_FILL;
+        end
+        else if (boss_hp_filled || slime0_hp_filled || slime1_hp_filled) begin
+            pixel_data = C_MINION;
         end
         else if (player_hp_bar_region || boss_hp_bar_region || slime0_bar_region || slime1_bar_region) begin
             pixel_data = C_HP_EMPTY;
