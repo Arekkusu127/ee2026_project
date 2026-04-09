@@ -1,4 +1,46 @@
 `timescale 1ns / 1ps
+module slime0(
+    input frame_begin,
+    input [3:0] x_pos,
+    input [3:0] y_pos,
+    output [15:0] pixel,
+    output visible
+);
+    reg [15:0] rom [0:125];
+    initial begin
+        `ifdef SYNTHESIS
+            $readmemb("../../FDP.srcs/sources_1/new/slime0.bin", rom);
+        `else
+            $readmemb("../../../../FDP.srcs/sources_1/new/slime0.bin", rom);
+        `endif
+    end
+
+    wire [6:0] addr = y_pos * 14 + {3'd0, x_pos};
+    assign pixel = rom[addr];
+    assign visible = (pixel != 16'hffff);
+endmodule
+
+module slime1(
+    input frame_begin,
+    input [3:0] x_pos,
+    input [3:0] y_pos,
+    output [15:0] pixel,
+    output visible
+);
+    reg [15:0] rom [0:125];
+    initial begin
+        `ifdef SYNTHESIS
+            $readmemb("../../FDP.srcs/sources_1/new/slime1.bin", rom);
+        `else
+            $readmemb("../../../../FDP.srcs/sources_1/new/slime1.bin", rom);
+        `endif
+    end
+
+    wire [6:0] addr = y_pos * 14 + {3'd0, x_pos};
+    assign pixel = rom[addr];
+    assign visible = (pixel != 16'hffff);
+endmodule
+
 module boss(
     input frame_begin,
     input [5:0] x_pos,
@@ -108,6 +150,9 @@ module render(
     input  [45:0] enemy_entity_1,
     input  [45:0] enemy_entity_2,
     input  [2:0]  enemy_alive,
+    input  [6:0]  slime0_x,
+    input  [6:0]  slime1_x,
+    input  [5:0]  slime_y,
     input         proj_active,
     input  [6:0]  proj_x,
     input  [5:0]  proj_y,
@@ -151,6 +196,11 @@ module render(
     wire [3:0] ehw2 = enemy_entity_2[6:3];
     wire [2:0] ehh2 = enemy_entity_2[2:0];
     wire [5:0] ehp2 = enemy_entity_2[43:38];
+    wire boss_phase  = current_round && enemy_alive[0] && (enemy_entity_0 != 46'd0);
+    wire slime_phase = !current_round;
+
+    localparam [6:0] SLIME_W = 7'd14;
+    localparam [5:0] SLIME_H = 6'd9;
 
     // Colors (RGB565)
     localparam C_PLAYER       = 16'hFFE0;
@@ -166,6 +216,7 @@ module render(
     localparam C_VICTORY      = 16'hFFE0;
     localparam C_DEFEAT       = 16'hF800;
     localparam C_TRAIL        = 16'h7BEF;
+    //localparam C_SLIME        = 16'h07E0;
 
     // ============================================================
     // BACKGROUND INTEGRATION
@@ -207,63 +258,70 @@ module render(
     // ============================================================
     wire signed [7:0] php_bar_top = $signed({2'b0, py}) - $signed({5'b0, phh}) - 8'sd7;
     wire signed [7:0] php_bar_bot = $signed({2'b0, py}) - $signed({5'b0, phh}) - 8'sd3;
-    wire player_hp_bar_region = 
-        (pix_x == px || pix_x == px - 7'd1) &&
-        ($signed({2'b0, pix_y}) >= php_bar_top) &&
-        ($signed({2'b0, pix_y}) <= php_bar_bot) &&
-        (php_bar_top >= 0);
-    wire [2:0] php_fill = (php >= 6'd50) ? 3'd5 :
-                           (php >= 6'd40) ? 3'd4 :
-                           (php >= 6'd30) ? 3'd3 :
-                           (php >= 6'd20) ? 3'd2 :
-                           (php >= 6'd10) ? 3'd1 : 3'd0;
-    wire signed [7:0] php_fill_top = php_bar_bot - $signed({5'b0, php_fill}) + 8'sd1;
-    wire player_hp_filled = player_hp_bar_region && ($signed({2'b0, pix_y}) >= php_fill_top);
+    // Player HP bar - horizontal bar floating above the girl sprite
+    wire [6:0] player_bar_left  = girl_left + 7'd5;
+    wire [6:0] player_bar_right = girl_left + 7'd24;   // 20 pixels wide
+    wire [5:0] player_bar_y0    = (girl_top >= 6'd4) ? (girl_top - 6'd4) : 6'd0;
+    wire [5:0] player_bar_y1    = (girl_top >= 6'd3) ? (girl_top - 6'd3) : 6'd0;
 
-    wire signed [7:0] e0_bar_top = $signed({2'b0, ey0}) - $signed({5'b0, ehh0}) - 8'sd7;
-    wire signed [7:0] e0_bar_bot = $signed({2'b0, ey0}) - $signed({5'b0, ehh0}) - 8'sd3;
-    wire e0_hp_bar_region = enemy_alive[0] &&
+    wire player_hp_bar_region =
+        (pix_x >= player_bar_left) && (pix_x <= player_bar_right) &&
+        (pix_y >= player_bar_y0)   && (pix_y <= player_bar_y1);
+
+    wire [4:0] player_hp_fill_w =
+        (php >= 6'd50) ? 5'd20 :
+        (php >= 6'd40) ? 5'd16 :
+        (php >= 6'd30) ? 5'd12 :
+        (php >= 6'd20) ? 5'd8  :
+        (php >= 6'd10) ? 5'd4  : 5'd0;
+
+    wire player_hp_filled =
+        player_hp_bar_region &&
+        (pix_x < player_bar_left + player_hp_fill_w);
+
+    // Boss HP bar (round 2)
+    wire signed [7:0] boss_bar_top = $signed({2'b0, ey0}) - $signed({5'b0, ehh0}) - 8'sd7;
+    wire signed [7:0] boss_bar_bot = $signed({2'b0, ey0}) - $signed({5'b0, ehh0}) - 8'sd3;
+    wire boss_hp_bar_region = boss_phase &&
         (pix_x == ex0 || pix_x == ex0 - 7'd1) &&
-        ($signed({2'b0, pix_y}) >= e0_bar_top) &&
-        ($signed({2'b0, pix_y}) <= e0_bar_bot) &&
-        (e0_bar_top >= 0);
-    wire [2:0] e0_fill = (ehp0 >= 6'd50) ? 3'd5 :
-                          (ehp0 >= 6'd40) ? 3'd4 :
-                          (ehp0 >= 6'd30) ? 3'd3 :
-                          (ehp0 >= 6'd20) ? 3'd2 :
-                          (ehp0 >= 6'd10) ? 3'd1 : 3'd0;
-    wire signed [7:0] e0_fill_top = e0_bar_bot - $signed({5'b0, e0_fill}) + 8'sd1;
-    wire e0_hp_filled = e0_hp_bar_region && ($signed({2'b0, pix_y}) >= e0_fill_top);
+        ($signed({2'b0, pix_y}) >= boss_bar_top) &&
+        ($signed({2'b0, pix_y}) <= boss_bar_bot) &&
+        (boss_bar_top >= 0);
+    wire [2:0] boss_fill = (ehp0 >= 6'd50) ? 3'd5 :
+                           (ehp0 >= 6'd40) ? 3'd4 :
+                           (ehp0 >= 6'd30) ? 3'd3 :
+                           (ehp0 >= 6'd20) ? 3'd2 :
+                           (ehp0 >= 6'd10) ? 3'd1 : 3'd0;
+    wire signed [7:0] boss_fill_top = boss_bar_bot - $signed({5'b0, boss_fill}) + 8'sd1;
+    wire boss_hp_filled = boss_hp_bar_region && ($signed({2'b0, pix_y}) >= boss_fill_top);
 
-    wire signed [7:0] e1_bar_top = $signed({2'b0, ey1}) - $signed({5'b0, ehh1}) - 8'sd7;
-    wire signed [7:0] e1_bar_bot = $signed({2'b0, ey1}) - $signed({5'b0, ehh1}) - 8'sd3;
-    wire e1_hp_bar_region = enemy_alive[1] && !current_round &&
-        (pix_x == ex1 || pix_x == ex1 - 7'd1) &&
-        ($signed({2'b0, pix_y}) >= e1_bar_top) &&
-        ($signed({2'b0, pix_y}) <= e1_bar_bot) &&
-        (e1_bar_top >= 0);
-    wire [2:0] e1_fill = (ehp1 >= 6'd50) ? 3'd5 :
-                          (ehp1 >= 6'd40) ? 3'd4 :
-                          (ehp1 >= 6'd30) ? 3'd3 :
-                          (ehp1 >= 6'd20) ? 3'd2 :
-                          (ehp1 >= 6'd10) ? 3'd1 : 3'd0;
-    wire signed [7:0] e1_fill_top = e1_bar_bot - $signed({5'b0, e1_fill}) + 8'sd1;
-    wire e1_hp_filled = e1_hp_bar_region && ($signed({2'b0, pix_y}) >= e1_fill_top);
+    // Slime 0 HP bar (horizontal)
+    wire slime0_bar_region = slime_phase && enemy_alive[0] &&
+                             (slime_y >= 6'd2) &&
+                             (pix_y == slime_y - 6'd2) &&
+                             (pix_x >= slime0_x) && (pix_x < slime0_x + SLIME_W);
 
-    wire signed [7:0] e2_bar_top = $signed({2'b0, ey2}) - $signed({5'b0, ehh2}) - 8'sd7;
-    wire signed [7:0] e2_bar_bot = $signed({2'b0, ey2}) - $signed({5'b0, ehh2}) - 8'sd3;
-    wire e2_hp_bar_region = enemy_alive[2] && !current_round &&
-        (pix_x == ex2 || pix_x == ex2 - 7'd1) &&
-        ($signed({2'b0, pix_y}) >= e2_bar_top) &&
-        ($signed({2'b0, pix_y}) <= e2_bar_bot) &&
-        (e2_bar_top >= 0);
-    wire [2:0] e2_fill = (ehp2 >= 6'd50) ? 3'd5 :
-                          (ehp2 >= 6'd40) ? 3'd4 :
-                          (ehp2 >= 6'd30) ? 3'd3 :
-                          (ehp2 >= 6'd20) ? 3'd2 :
-                          (ehp2 >= 6'd10) ? 3'd1 : 3'd0;
-    wire signed [7:0] e2_fill_top = e2_bar_bot - $signed({5'b0, e2_fill}) + 8'sd1;
-    wire e2_hp_filled = e2_hp_bar_region && ($signed({2'b0, pix_y}) >= e2_fill_top);
+    wire [3:0] slime0_fill_w = (ehp0 >= 6'd50) ? 4'd14 :
+                               (ehp0 >= 6'd40) ? 4'd11 :
+                               (ehp0 >= 6'd30) ? 4'd8  :
+                               (ehp0 >= 6'd20) ? 4'd6  :
+                               (ehp0 >= 6'd10) ? 4'd3  : 4'd0;
+
+    wire slime0_hp_filled = slime0_bar_region && (pix_x < slime0_x + slime0_fill_w);
+
+    // Slime 1 HP bar (horizontal)
+    wire slime1_bar_region = slime_phase && enemy_alive[1] &&
+                             (slime_y >= 6'd2) &&
+                             (pix_y == slime_y - 6'd2) &&
+                             (pix_x >= slime1_x) && (pix_x < slime1_x + SLIME_W);
+
+    wire [3:0] slime1_fill_w = (ehp1 >= 6'd50) ? 4'd14 :
+                               (ehp1 >= 6'd40) ? 4'd11 :
+                               (ehp1 >= 6'd30) ? 4'd8  :
+                               (ehp1 >= 6'd20) ? 4'd6  :
+                               (ehp1 >= 6'd10) ? 4'd3  : 4'd0;
+
+    wire slime1_hp_filled = slime1_bar_region && (pix_x < slime1_x + slime1_fill_w);
 
     // ============================================================
     // ENTITY SPRITES
@@ -288,7 +346,7 @@ module render(
         .visible(girl_vis)
     );
 
-    wire boss_phase = current_round && enemy_alive[0] && (enemy_entity_0 != 46'd0);
+    
 
     // fixed boss sprite position
     wire [6:0] boss_left = 7'd55;
@@ -316,32 +374,43 @@ module render(
     wire boss_beam_hit = boss_attack_active &&
                         (pix_x >= boss_attack_x) &&
                         (pix_x <= boss_attack_x + 7'd1);
-    wire enemy0_vis = !boss_phase && !current_round && (enemy_entity_0 != 46'd0) && enemy_alive[0];//enemy disappears during boss phase
-    wire enemy1_vis = !boss_phase && !current_round && (enemy_entity_1 != 46'd0) && enemy_alive[1];
-    wire enemy2_vis = !boss_phase && !current_round && (enemy_entity_2 != 46'd0) && enemy_alive[2];
 
-   // wire enemy0_vis = (enemy_entity_0 != 46'd0);
-    wire enemy0_hit = enemy0_vis &&
-                      (ex0 >= {3'd0, ehw0}) && (ey0 >= {3'd0, ehh0}) &&
-                      (pix_x >= ex0 - {3'd0, ehw0}) && (pix_x <= ex0 + {3'd0, ehw0}) &&
-                      (pix_y >= ey0 - {3'd0, ehh0}) && (pix_y <= ey0 + {3'd0, ehh0});
-    wire [15:0] enemy0_color = !enemy_alive[0] ? C_MINION_DEAD :
-                               (et0 == 2'b10) ? C_BOSS : C_MINION;
+    wire in_slime0 = slime_phase && enemy_alive[0] &&
+                     (pix_x >= slime0_x) && (pix_x < slime0_x + 7'd14) &&
+                     (pix_y >= slime_y ) && (pix_y < slime_y  + 6'd9);
 
-   // wire enemy1_vis = !current_round && (enemy_entity_1 != 46'd0);
-    wire enemy1_hit = enemy1_vis &&
-                      (ex1 >= {3'd0, ehw1}) && (ey1 >= {3'd0, ehh1}) &&
-                      (pix_x >= ex1 - {3'd0, ehw1}) && (pix_x <= ex1 + {3'd0, ehw1}) &&
-                      (pix_y >= ey1 - {3'd0, ehh1}) && (pix_y <= ey1 + {3'd0, ehh1});
-    wire [15:0] enemy1_color = !enemy_alive[1] ? C_MINION_DEAD : C_MINION;
+    wire in_slime1 = slime_phase && enemy_alive[1] &&
+                     (pix_x >= slime1_x) && (pix_x < slime1_x + 7'd14) &&
+                     (pix_y >= slime_y ) && (pix_y < slime_y  + 6'd9);
 
-   // wire enemy2_vis = !current_round && (enemy_entity_2 != 46'd0);
-    wire enemy2_hit = enemy2_vis &&
-                      (ex2 >= {3'd0, ehw2}) && (ey2 >= {3'd0, ehh2}) &&
-                      (pix_x >= ex2 - {3'd0, ehw2}) && (pix_x <= ex2 + {3'd0, ehw2}) &&
-                      (pix_y >= ey2 - {3'd0, ehh2}) && (pix_y <= ey2 + {3'd0, ehh2});
-    wire [15:0] enemy2_color = !enemy_alive[2] ? C_MINION_DEAD : C_MINION;
-   
+    wire [6:0] local_x0_full = pix_x - slime0_x;
+    wire [5:0] local_y0_full = pix_y - slime_y;
+    wire [6:0] local_x1_full = pix_x - slime1_x;
+    wire [5:0] local_y1_full = pix_y - slime_y;
+
+    wire [3:0] local_x0 = local_x0_full[3:0];
+    wire [3:0] local_y0 = local_y0_full[3:0];
+    wire [3:0] local_x1 = local_x1_full[3:0];
+    wire [3:0] local_y1 = local_y1_full[3:0];
+
+    wire [15:0] slime0_pixel, slime1_pixel;
+    wire slime0_vis, slime1_vis;
+
+    slime0 slime0_inst(
+        .frame_begin(frame_begin),
+        .x_pos(local_x0),
+        .y_pos(local_y0),
+        .pixel(slime0_pixel),
+        .visible(slime0_vis)
+    );
+
+    slime1 slime1_inst(
+        .frame_begin(frame_begin),
+        .x_pos(local_x1),
+        .y_pos(local_y1),
+        .pixel(slime1_pixel),
+        .visible(slime1_vis)
+    );  
 
 
     wire proj_hit = proj_active &&
@@ -378,10 +447,10 @@ module render(
         else if (proj_hit) begin
             pixel_data = C_PROJ;
         end
-        else if (player_hp_filled || e0_hp_filled || e1_hp_filled || e2_hp_filled) begin
+        else if (player_hp_filled || boss_hp_filled || slime0_hp_filled || slime1_hp_filled) begin
             pixel_data = C_HP_FILL;
         end
-        else if (player_hp_bar_region || e0_hp_bar_region || e1_hp_bar_region || e2_hp_bar_region) begin
+        else if (player_hp_bar_region || boss_hp_bar_region || slime0_bar_region || slime1_bar_region) begin
             pixel_data = C_HP_EMPTY;
         end
         else if (in_girl && girl_vis) begin
@@ -390,14 +459,11 @@ module render(
         else if (in_boss && boss_vis) begin
             pixel_data = boss_pixel;
         end
-        else if (enemy0_hit) begin
-            pixel_data = enemy0_color;
+        else if (in_slime0 && slime0_vis) begin
+            pixel_data = slime0_pixel;
         end
-        else if (enemy1_hit) begin
-            pixel_data = enemy1_color;
-        end
-        else if (enemy2_hit) begin
-            pixel_data = enemy2_color;
+        else if (in_slime1 && slime1_vis) begin
+            pixel_data = slime1_pixel;
         end
         else if (trail_dotted) begin
             pixel_data = C_TRAIL;

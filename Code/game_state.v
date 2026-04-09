@@ -23,6 +23,9 @@ module game_state(
     input         move_right,
     input         confirm_aim,
     input  [3:0]  skill_sel,
+    input  [6:0]  slime0_x,
+    input  [6:0]  slime1_x,
+    input  [5:0]  slime_y,
     output reg [6:0]  terrain_rd_addr_a,
     input      [5:0]  terrain_rd_data_a,
     output reg        terrain_wr_en,
@@ -124,6 +127,9 @@ module game_state(
 
     assign player_x = ent_px(player_entity);
     assign player_y = ent_py(player_entity);
+    wire [6:0] slime0_cx = slime0_x + 7'd7;  // slime width = 14
+    wire [6:0] slime1_cx = slime1_x + 7'd7;
+    wire [5:0] slime_cy  = slime_y  + 6'd4;  // slime height = 9    
 
     reg [8:0] real_hp_player;
     reg [8:0] real_hp_enemy [0:2];
@@ -351,7 +357,7 @@ module game_state(
             player_energy     <= 4'd12;
             player_fuel       <= 4'd10;
             current_round     <= 0;
-            enemy_alive       <= 3'b111;
+            enemy_alive       <= 3'b011;
             proj_active       <= 0;
             proj_x            <= 0;
             proj_y            <= 0;
@@ -401,16 +407,15 @@ module game_state(
             arc_needs_update  <= 0;
             last_reticle_x    <= 7'd0;
             last_reticle_y    <= 6'd0;
-
+            player_entity     <= pack_entity(TYPE_PLAYER, 6'd50, 6'd5, 6'd25, 6'd12, 7'd20, 6'd0, 4'd3, 3'd3);
             // Stats integrated from stats.v
-            player_entity  <= pack_entity(TYPE_PLAYER, 6'd50, 6'd5, 6'd25, 6'd12, 7'd10, 6'd0, 4'd3, 3'd3);
-            enemy_entity_0 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd55, 6'd0, 4'd2, 3'd3);
-            enemy_entity_1 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd70, 6'd0, 4'd2, 3'd3);
-            enemy_entity_2 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd85, 6'd0, 4'd2, 3'd3);
+            enemy_entity_0 <= pack_entity(TYPE_MINION, 6'd50, 6'd0, 6'd0, 6'd0, 7'd89, 6'd49, 4'd7, 3'd4);
+            enemy_entity_1 <= pack_entity(TYPE_MINION, 6'd50, 6'd0, 6'd0, 6'd0, 7'd103, 6'd49, 4'd7, 3'd4);
+            enemy_entity_2 <= 46'd0;
 
             real_hp_enemy[0] <= 9'd50;
             real_hp_enemy[1] <= 9'd50;
-            real_hp_enemy[2] <= 9'd50;
+            real_hp_enemy[2] <= 9'd0;
         end else begin
             terrain_wr_en <= 0;
             trail_clear   <= 0;
@@ -519,42 +524,24 @@ module game_state(
                     player_entity <= set_pos(player_entity,
                         ent_px(player_entity),
                         (terrain_rd_data_a >= 6'd6) ? terrain_rd_data_a - 6'd5 : 6'd1);
-                    terrain_rd_addr_a <= ent_px(enemy_entity_0);
-                    init_step <= 3'd4;
-                end
-                3'd4: begin
-                    if (current_round)
-                        enemy_entity_0 <= set_pos(enemy_entity_0,
-                            ent_px(enemy_entity_0),
-                            (terrain_rd_data_a >= 6'd7) ? terrain_rd_data_a - 6'd6 : 6'd1);
-                    else
-                        enemy_entity_0 <= set_pos(enemy_entity_0,
-                            ent_px(enemy_entity_0),
-                            (terrain_rd_data_a >= 6'd6) ? terrain_rd_data_a - 6'd5 : 6'd1);
-                    if (!current_round) begin
-                        terrain_rd_addr_a <= ent_px(enemy_entity_1);
-                        init_step <= 3'd5;
+
+                    if (current_round) begin
+                        terrain_rd_addr_a <= ent_px(enemy_entity_0);
+                        init_step <= 3'd4;
                     end else begin
                         init_step <= 3'd7;
                     end
                 end
-                3'd5: begin
-                    enemy_entity_1 <= set_pos(enemy_entity_1,
-                        ent_px(enemy_entity_1),
-                        (terrain_rd_data_a >= 6'd6) ? terrain_rd_data_a - 6'd5 : 6'd1);
-                    terrain_rd_addr_a <= ent_px(enemy_entity_2);
-                    init_step <= 3'd6;
-                end
-                3'd6: begin
-                    enemy_entity_2 <= set_pos(enemy_entity_2,
-                        ent_px(enemy_entity_2),
-                        (terrain_rd_data_a >= 6'd6) ? terrain_rd_data_a - 6'd5 : 6'd1);
+                3'd4: begin
+                    enemy_entity_0 <= set_pos(enemy_entity_0,
+                        ent_px(enemy_entity_0),
+                        (terrain_rd_data_a >= 6'd7) ? terrain_rd_data_a - 6'd6 : 6'd1);
                     init_step <= 3'd7;
                 end
                 3'd7: begin
                     game_phase        <= PH_MOVE;
-                    is_player_turn    <= 1;
-                    current_enemy_idx <= 0;
+                    is_player_turn    <= 1'b1;
+                    current_enemy_idx <= 2'd0;
                     player_fuel       <= 4'd10;
                     init_step         <= 0;
                     init_col          <= 0;
@@ -800,23 +787,27 @@ module game_state(
 
                     // Check entity hit during animation for player shots
                     if (is_player_turn && !proj_fx[20] && !proj_fy[20]) begin
-                        if (enemy_alive[0] && manhattan(proj_fx[14:8], proj_fy[13:8],
-                            ent_px(enemy_entity_0), ent_py(enemy_entity_0)) <= {4'd0, skill_blast}) begin
-                            proj_active  <= 0;
-                            game_phase   <= PH_RESOLVE;
-                            resolve_step <= 0;
-                        end
-                        if (enemy_alive[1] && manhattan(proj_fx[14:8], proj_fy[13:8],
-                            ent_px(enemy_entity_1), ent_py(enemy_entity_1)) <= {4'd0, skill_blast}) begin
-                            proj_active  <= 0;
-                            game_phase   <= PH_RESOLVE;
-                            resolve_step <= 0;
-                        end
-                        if (enemy_alive[2] && manhattan(proj_fx[14:8], proj_fy[13:8],
-                            ent_px(enemy_entity_2), ent_py(enemy_entity_2)) <= {4'd0, skill_blast}) begin
-                            proj_active  <= 0;
-                            game_phase   <= PH_RESOLVE;
-                            resolve_step <= 0;
+                        if (!current_round) begin
+                            if (enemy_alive[0] &&
+                                manhattan(proj_fx[14:8], proj_fy[13:8], slime0_cx, slime_cy) <= {4'd0, skill_blast}) begin
+                                proj_active  <= 0;
+                                game_phase   <= PH_RESOLVE;
+                                resolve_step <= 0;
+                            end
+                            if (enemy_alive[1] &&
+                                manhattan(proj_fx[14:8], proj_fy[13:8], slime1_cx, slime_cy) <= {4'd0, skill_blast}) begin
+                                proj_active  <= 0;
+                                game_phase   <= PH_RESOLVE;
+                                resolve_step <= 0;
+                            end
+                        end else begin
+                            if (enemy_alive[0] &&
+                                manhattan(proj_fx[14:8], proj_fy[13:8],
+                                    ent_px(enemy_entity_0), ent_py(enemy_entity_0)) <= {4'd0, skill_blast}) begin
+                                proj_active  <= 0;
+                                game_phase   <= PH_RESOLVE;
+                                resolve_step <= 0;
+                            end
                         end
                     end
 
@@ -841,63 +832,58 @@ module game_state(
                     next_enemy_hp1   = real_hp_enemy[1];
                     next_enemy_hp2   = real_hp_enemy[2];
                     next_enemy_alive = enemy_alive;
-                    enemy_attack_damage = 6'd15;
-
-                    if (!is_player_turn && !current_round) begin
-                        case (current_enemy_idx)
-                            2'd0: enemy_attack_damage = ent_atk(enemy_entity_0);
-                            2'd1: enemy_attack_damage = ent_atk(enemy_entity_1);
-                            2'd2: enemy_attack_damage = ent_atk(enemy_entity_2);
-                            default: enemy_attack_damage = 6'd15;
-                        endcase
-                    end
 
                     if (is_player_turn) begin
-                        // Player attacks enemies
-                        if (enemy_alive[0] &&
-                            manhattan(proj_x, proj_y, ent_px(enemy_entity_0), ent_py(enemy_entity_0)) <= {4'd0, skill_blast}) begin
-                            if (next_enemy_hp0 <= {3'd0, skill_damage}) begin
-                                hit_event           <= 1'b1;
-                                hit_damage          <= next_enemy_hp0[7:0];
-                                next_enemy_hp0      = 9'd0;
-                                next_enemy_alive[0] = 1'b0;
-                            end else begin
-                                hit_event      <= 1'b1;
-                                hit_damage     <= {2'd0, skill_damage};
-                                next_enemy_hp0 = next_enemy_hp0 - {3'd0, skill_damage};
+                        if (!current_round) begin
+                            // Player attacks slime 0
+                            if (enemy_alive[0] &&
+                                manhattan(proj_x, proj_y, slime0_cx, slime_cy) <= {4'd0, skill_blast}) begin
+                                if (next_enemy_hp0 <= {3'd0, skill_damage}) begin
+                                    hit_event           <= 1'b1;
+                                    hit_damage          <= next_enemy_hp0[7:0];
+                                    next_enemy_hp0      = 9'd0;
+                                    next_enemy_alive[0] = 1'b0;
+                                end else begin
+                                    hit_event      <= 1'b1;
+                                    hit_damage     <= {2'd0, skill_damage};
+                                    next_enemy_hp0 = next_enemy_hp0 - {3'd0, skill_damage};
+                                end
                             end
-                        end
 
-                        if (enemy_alive[1] &&
-                            manhattan(proj_x, proj_y, ent_px(enemy_entity_1), ent_py(enemy_entity_1)) <= {4'd0, skill_blast}) begin
-                            if (next_enemy_hp1 <= {3'd0, skill_damage}) begin
-                                hit_event           <= 1'b1;
-                                hit_damage          <= next_enemy_hp1[7:0];
-                                next_enemy_hp1      = 9'd0;
-                                next_enemy_alive[1] = 1'b0;
-                            end else begin
-                                hit_event      <= 1'b1;
-                                hit_damage     <= {2'd0, skill_damage};
-                                next_enemy_hp1 = next_enemy_hp1 - {3'd0, skill_damage};
+                            // Player attacks slime 1
+                            if (enemy_alive[1] &&
+                                manhattan(proj_x, proj_y, slime1_cx, slime_cy) <= {4'd0, skill_blast}) begin
+                                if (next_enemy_hp1 <= {3'd0, skill_damage}) begin
+                                    hit_event           <= 1'b1;
+                                    hit_damage          <= next_enemy_hp1[7:0];
+                                    next_enemy_hp1      = 9'd0;
+                                    next_enemy_alive[1] = 1'b0;
+                                end else begin
+                                    hit_event      <= 1'b1;
+                                    hit_damage     <= {2'd0, skill_damage};
+                                    next_enemy_hp1 = next_enemy_hp1 - {3'd0, skill_damage};
+                                end
                             end
-                        end
-
-                        if (enemy_alive[2] &&
-                            manhattan(proj_x, proj_y, ent_px(enemy_entity_2), ent_py(enemy_entity_2)) <= {4'd0, skill_blast}) begin
-                            if (next_enemy_hp2 <= {3'd0, skill_damage}) begin
-                                hit_event           <= 1'b1;
-                                hit_damage          <= next_enemy_hp2[7:0];
-                                next_enemy_hp2      = 9'd0;
-                                next_enemy_alive[2] = 1'b0;
-                            end else begin
-                                hit_event      <= 1'b1;
-                                hit_damage     <= {2'd0, skill_damage};
-                                next_enemy_hp2 = next_enemy_hp2 - {3'd0, skill_damage};
+                        end else begin
+                            // Player attacks boss
+                            if (enemy_alive[0] &&
+                                manhattan(proj_x, proj_y,
+                                    ent_px(enemy_entity_0), ent_py(enemy_entity_0)) <= {4'd0, skill_blast}) begin
+                                if (next_enemy_hp0 <= {3'd0, skill_damage}) begin
+                                    hit_event           <= 1'b1;
+                                    hit_damage          <= next_enemy_hp0[7:0];
+                                    next_enemy_hp0      = 9'd0;
+                                    next_enemy_alive[0] = 1'b0;
+                                end else begin
+                                    hit_event      <= 1'b1;
+                                    hit_damage     <= {2'd0, skill_damage};
+                                    next_enemy_hp0 = next_enemy_hp0 - {3'd0, skill_damage};
+                                end
                             end
                         end
                     end
                     else if (current_round) begin
-                        // Boss beam attack uses boss_attack_x, not proj_x/proj_y
+                        // Boss beam damages player
                         if ((boss_attack_x <= ent_px(player_entity) + {3'd0, ent_hw(player_entity)}) &&
                             (boss_attack_x + 7'd1 >= ent_px(player_entity) - {3'd0, ent_hw(player_entity)})) begin
                             if (next_player_hp <= 9'd50) begin
@@ -908,20 +894,6 @@ module game_state(
                                 hit_event      <= 1'b1;
                                 hit_damage     <= 8'd50;
                                 next_player_hp = next_player_hp - 9'd50;
-                            end
-                        end
-                    end
-                    else begin
-                        // Minion projectile damage to player
-                        if (manhattan(proj_x, proj_y, ent_px(player_entity), ent_py(player_entity)) <= 8'd5) begin
-                            if (next_player_hp <= {3'd0, enemy_attack_damage}) begin
-                                hit_event      <= 1'b1;
-                                hit_damage     <= next_player_hp[7:0];
-                                next_player_hp = 9'd0;
-                            end else begin
-                                hit_event      <= 1'b1;
-                                hit_damage     <= {2'd0, enemy_attack_damage};
-                                next_player_hp = next_player_hp - {3'd0, enemy_attack_damage};
                             end
                         end
                     end
@@ -938,8 +910,7 @@ module game_state(
                         (next_enemy_hp0 > 9'd63) ? 6'd63 : next_enemy_hp0[5:0]);
                     enemy_entity_1 <= set_hp(enemy_entity_1,
                         (next_enemy_hp1 > 9'd63) ? 6'd63 : next_enemy_hp1[5:0]);
-                    enemy_entity_2 <= set_hp(enemy_entity_2,
-                        (next_enemy_hp2 > 9'd63) ? 6'd63 : next_enemy_hp2[5:0]);
+                    enemy_entity_2 <= 46'd0;
 
                     if (next_player_hp == 9'd0) begin
                         defeat     <= 1'b1;
@@ -953,9 +924,8 @@ module game_state(
                             current_enemy_idx <= 2'd0;
                             player_fuel       <= 4'd10;
 
-                            // Spawn boss directly at a visible place
                             enemy_entity_0    <= pack_entity(TYPE_BOSS, 6'd63, 6'd30, 6'd40, 6'd0,
-                                                             7'd75, 6'd38, 4'd5, 3'd4);
+                                                             7'd75, 6'd32, 4'd5, 3'd4);
                             enemy_entity_1    <= 46'd0;
                             enemy_entity_2    <= 46'd0;
                             real_hp_enemy[0]  <= 9'd400;
@@ -970,7 +940,14 @@ module game_state(
                         end
                     end
                     else begin
-                        game_phase <= PH_NEXTTURN;
+                        if (!current_round) begin
+                            // Round 1: slimes do not attack, go straight back to player move
+                            is_player_turn <= 1'b1;
+                            player_fuel    <= 4'd10;
+                            game_phase     <= PH_MOVE;
+                        end else begin
+                            game_phase <= PH_NEXTTURN;
+                        end
                     end
 
                     resolve_step <= 0;
@@ -981,39 +958,22 @@ module game_state(
 
             // ===== NEXT TURN =====
             PH_NEXTTURN: begin
-                if (is_player_turn) begin
-                    is_player_turn <= 0;
-                    if (!current_round) begin
-                        if (enemy_alive[0])      current_enemy_idx <= 2'd0;
-                        else if (enemy_alive[1]) current_enemy_idx <= 2'd1;
-                        else if (enemy_alive[2]) current_enemy_idx <= 2'd2;
-                        else                     is_player_turn <= 1;
-                    end else begin
-                        current_enemy_idx <= 2'd0;
-                    end
-                    game_phase <= PH_MOVE;
+                if (!current_round) begin
+                    is_player_turn <= 1'b1;
+                    player_fuel    <= 4'd10;
+                    game_phase     <= PH_MOVE;
                 end else begin
-                    if (!current_round) begin
-                        if (current_enemy_idx == 2'd0 && (enemy_alive[1] || enemy_alive[2])) begin
-                            if (enemy_alive[1])  current_enemy_idx <= 2'd1;
-                            else                 current_enemy_idx <= 2'd2;
-                            game_phase <= PH_MOVE;
-                        end else if (current_enemy_idx == 2'd1 && enemy_alive[2]) begin
-                            current_enemy_idx <= 2'd2;
-                            game_phase <= PH_MOVE;
-                        end else begin
-                            is_player_turn <= 1;
-                            player_fuel    <= 4'd10;
-                            game_phase     <= PH_MOVE;
-                        end
+                    if (is_player_turn) begin
+                        is_player_turn    <= 1'b0;
+                        current_enemy_idx <= 2'd0;
+                        game_phase        <= PH_MOVE;
                     end else begin
-                        is_player_turn <= 1;
+                        is_player_turn <= 1'b1;
                         player_fuel    <= 4'd10;
                         game_phase     <= PH_MOVE;
                     end
                 end
             end
-
             // ===== GAMEOVER =====
             PH_GAMEOVER: begin
                 // Stay

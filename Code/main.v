@@ -1,4 +1,78 @@
 `timescale 1ns / 1ps
+module slime_ctrl(
+    input CLOCK, 
+    input frame_begin,
+    input game_mode,
+    output reg [6:0] slime0_x,  // left edge x position
+    output reg [6:0] slime1_x,
+    output     [5:0] slime_y
+    );
+
+    localparam SLIME_W = 14; // change size and boundary here
+    localparam SLIME_H = 9;
+    localparam SPRITE_PIXELS = SLIME_W * SLIME_H;  // 126 pixels
+    localparam LEFT_BOUND = 51; // left boundary for slimes (must be >= 0 and <= X_MAX - SLIME_W)
+    localparam RIGHT_BOUND = 82; // right boundary for slimes (must be >= SLIME_W and <= 127)
+    localparam GROUND_Y = 54; // y-coordinate of the ground (must be >= SLIME_H and <= 63)
+
+    assign slime_y = GROUND_Y - SLIME_H; // fixed y-coordinate for both slimes
+    reg slime0_dir = 1'b0; // moving left
+    reg slime1_dir = 1'b0; // moving right
+    
+    reg [7:0] cnt0 = 0;
+    reg [8:0] cnt1 = 0;
+
+
+    initial begin
+        slime0_x = RIGHT_BOUND;
+        slime1_x = 7'd96;
+    end
+    wire slimes_touch = (slime0_x <= slime1_x + SLIME_W-1) && (slime1_x <= slime0_x + SLIME_W-1);
+
+    always @(posedge CLOCK) begin
+        if (game_mode && frame_begin) begin
+
+            // ?? Slime0: moves every 6 frames ???????????????
+            if (cnt0 == 8'd200) begin
+                cnt0 <= 0;
+                // Update direction before moving
+                if      (slime0_x <= LEFT_BOUND)  slime0_dir = 1'b1;
+                else if (slime0_x >= RIGHT_BOUND) slime0_dir = 1'b0;
+                else if (slimes_touch) slime0_dir = ~slime0_dir;
+
+                // Move one pixel
+                if (slime0_dir)
+                    slime0_x <= (slime0_x >= RIGHT_BOUND) ? RIGHT_BOUND : slime0_x + 1;
+                else
+                    slime0_x <= (slime0_x <= LEFT_BOUND)  ? LEFT_BOUND  : slime0_x - 1;
+            end else begin
+                cnt0 <= cnt0 + 1;
+            end
+
+            // ?? Slime1: moves every 9 frames ???????????????
+            if (cnt1 == 9'd260) begin
+                cnt1 <= 0;
+                if (slime1_x > RIGHT_BOUND) begin
+                    // Still entering from off-screen - just walk left
+                    slime1_x <= slime1_x - 1;
+                end else begin
+                    // Now in patrol zone - normal bounce behaviour
+                    if      (slime1_x <= LEFT_BOUND)  slime1_dir = 1'b1;
+                    else if (slime1_x >= RIGHT_BOUND) slime1_dir = 1'b0;
+                    else if (slimes_touch)            slime1_dir = ~slime1_dir;
+
+                    if (slime1_dir)
+                        slime1_x <= (slime1_x >= RIGHT_BOUND) ? RIGHT_BOUND : slime1_x + 1;
+                    else
+                        slime1_x <= (slime1_x <= LEFT_BOUND)  ? LEFT_BOUND  : slime1_x - 1;
+                end
+            end else begin
+                cnt1 <= cnt1 + 1;
+            end
+
+        end
+    end
+endmodule
 
 module main(
     input         clk,
@@ -87,6 +161,9 @@ module main(
     wire [45:0] enemy_entity_0;
     wire [45:0] enemy_entity_1;
     wire [45:0] enemy_entity_2;
+    wire [6:0]  slime0_x;
+    wire [6:0] slime1_x;
+    wire [5:0] slime_y;
 
     // ---- Terrain RAM signals ----
     wire [6:0]  terrain_rd_addr_a;
@@ -190,6 +267,9 @@ module main(
         .move_right(game_ar),
         .confirm_aim(game_fire),
         .skill_sel(skill_sel),
+        .slime0_x(slime0_x),
+        .slime1_x(slime1_x),
+        .slime_y(slime_y),
         .terrain_rd_addr_a(terrain_rd_addr_a),
         .terrain_rd_data_a(terrain_rd_data_a),
         .terrain_wr_en(terrain_wr_en),
@@ -235,7 +315,15 @@ module main(
     wire        sending_pixels, sample_pixel;
     wire [12:0] pixel_index;
     wire [15:0] pixel_data;
-
+    wire slime_game_mode = game_started && !current_round && (enemy_alive[0] || enemy_alive[1]) && !victory && !defeat;
+    slime_ctrl slime_ctrl_inst (
+        .CLOCK(clk),
+        .frame_begin(frame_begin),
+        .game_mode(slime_game_mode),
+        .slime0_x(slime0_x),
+        .slime1_x(slime1_x),
+        .slime_y(slime_y)
+    );
     assign pix_x = pixel_index % 96;
     assign pix_y = pixel_index / 96;
 
@@ -259,6 +347,9 @@ module main(
         .enemy_entity_1(enemy_entity_1),
         .enemy_entity_2(enemy_entity_2),
         .enemy_alive(enemy_alive),
+        .slime0_x(slime0_x),
+        .slime1_x(slime1_x),
+        .slime_y(slime_y),
         .proj_active(proj_active),
         .proj_x(proj_x),
         .proj_y(proj_y),
