@@ -2,29 +2,116 @@
 # Vivado v2018.2 (64-bit)
 # SW Build 2258646 on Thu Jun 14 20:03:12 MDT 2018
 # IP Build 2256618 on Thu Jun 14 22:10:49 MDT 2018
-# Start of session at: Fri Mar 20 20:46:28 2026
-# Process ID: 12132
-# Current directory: C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP
-# Command line: vivado.exe -gui_launcher_event rodinguilauncherevent15140 C:\Users\jiayu\Documents\GitHub\ee2026_project\FDP\FDP.xpr
-# Log file: C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/vivado.log
-# Journal file: C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP\vivado.jou
+# Start of session at: Thu Apr  9 01:14:39 2026
+# Process ID: 30920
+# Current directory: D:/2026 group/ee2026_project/FDP
+# Command line: vivado.exe -gui_launcher_event rodinguilauncherevent24108 D:\2026 group\ee2026_project\FDP\FDP.xpr
+# Log file: D:/2026 group/ee2026_project/FDP/vivado.log
+# Journal file: D:/2026 group/ee2026_project/FDP\vivado.jou
 #-----------------------------------------------------------
 start_gui
-open_project C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.xpr
+open_project {D:/2026 group/ee2026_project/FDP/FDP.xpr}
 update_compile_order -fileset sources_1
-update_compile_order -fileset sources_1
-export_ip_user_files -of_objects  [get_files C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/task_p.v] -no_script -reset -force -quiet
-remove_files  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/task_p.v
-file delete -force C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/task_p.v
-export_ip_user_files -of_objects  [get_files C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/task_q.v] -no_script -reset -force -quiet
-remove_files  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/task_q.v
-file delete -force C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/task_q.v
-export_ip_user_files -of_objects  [get_files C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/task_r.v] -no_script -reset -force -quiet
-remove_files  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/task_r.v
-file delete -force C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/task_r.v
-export_ip_user_files -of_objects  [get_files C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/task_s.v] -no_script -reset -force -quiet
-remove_files  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/task_s.v
-file delete -force C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/task_s.v
-export_ip_user_files -of_objects  [get_files C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/my_clock.v] -no_script -reset -force -quiet
-remove_files  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/my_clock.v
-file delete -force C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/my_clock.v
+reset_run synth_1
+launch_runs impl_1 -to_step write_bitstream -jobs 6
+wait_on_run impl_1
+reset_run synth_1
+launch_runs impl_1 -to_step write_bitstream -jobs 6
+wait_on_run impl_1
+reset_run synth_1
+launch_runs impl_1 -to_step write_bitstream -jobs 6
+wait_on_run impl_1
+open_hw
+connect_hw_server
+open_hw_target
+set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main.bit} [get_hw_devices xc7a35t_0]
+current_hw_device [get_hw_devices xc7a35t_0]
+refresh_hw_device -update_hw_probes false [lindex [get_hw_devices xc7a35t_0] 0]
+set_property PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property FULL_PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main.bit} [get_hw_devices xc7a35t_0]
+program_hw_devices [get_hw_devices xc7a35t_0]
+refresh_hw_device [lindex [get_hw_devices xc7a35t_0] 0]
+disconnect_hw_server localhost:3121
+connect_hw_server
+disconnect_hw_server localhost:3121
+connect_hw_server
+open_hw_target
+set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main.bit} [get_hw_devices xc7a35t_0]
+current_hw_device [get_hw_devices xc7a35t_0]
+refresh_hw_device -update_hw_probes false [lindex [get_hw_devices xc7a35t_0] 0]
+set_property PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property FULL_PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main.bit} [get_hw_devices xc7a35t_0]
+program_hw_devices [get_hw_devices xc7a35t_0]
+refresh_hw_device [lindex [get_hw_devices xc7a35t_0] 0]
+reset_run synth_1
+launch_runs impl_1 -to_step write_bitstream -jobs 6
+wait_on_run impl_1
+disconnect_hw_server localhost:3121
+connect_hw_server
+open_hw_target
+set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main.bit} [get_hw_devices xc7a35t_0]
+current_hw_device [get_hw_devices xc7a35t_0]
+refresh_hw_device -update_hw_probes false [lindex [get_hw_devices xc7a35t_0] 0]
+set_property PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property FULL_PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main.bit} [get_hw_devices xc7a35t_0]
+program_hw_devices [get_hw_devices xc7a35t_0]
+refresh_hw_device [lindex [get_hw_devices xc7a35t_0] 0]
+set_property PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property FULL_PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main.bit} [get_hw_devices xc7a35t_0]
+program_hw_devices [get_hw_devices xc7a35t_0]
+refresh_hw_device [lindex [get_hw_devices xc7a35t_0] 0]
+reset_run synth_1
+launch_runs impl_1 -to_step write_bitstream -jobs 6
+wait_on_run impl_1
+set_property PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property FULL_PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main.bit} [get_hw_devices xc7a35t_0]
+program_hw_devices [get_hw_devices xc7a35t_0]
+refresh_hw_device [lindex [get_hw_devices xc7a35t_0] 0]
+set_property PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property FULL_PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main.bit} [get_hw_devices xc7a35t_0]
+program_hw_devices [get_hw_devices xc7a35t_0]
+refresh_hw_device [lindex [get_hw_devices xc7a35t_0] 0]
+close_hw
+reset_run synth_1
+launch_runs impl_1 -to_step write_bitstream -jobs 6
+wait_on_run impl_1
+reset_run synth_1
+launch_runs impl_1 -to_step write_bitstream -jobs 6
+wait_on_run impl_1
+reset_run synth_1
+launch_runs impl_1 -to_step write_bitstream -jobs 6
+wait_on_run impl_1
+open_hw
+connect_hw_server
+open_hw_target
+set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main.bit} [get_hw_devices xc7a35t_0]
+current_hw_device [get_hw_devices xc7a35t_0]
+refresh_hw_device -update_hw_probes false [lindex [get_hw_devices xc7a35t_0] 0]
+set_property PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property FULL_PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main.bit} [get_hw_devices xc7a35t_0]
+program_hw_devices [get_hw_devices xc7a35t_0]
+refresh_hw_device [lindex [get_hw_devices xc7a35t_0] 0]
+close_hw
+reset_run synth_1
+launch_runs impl_1 -to_step write_bitstream -jobs 6
+wait_on_run impl_1
+open_hw
+connect_hw_server
+open_hw_target
+set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main.bit} [get_hw_devices xc7a35t_0]
+current_hw_device [get_hw_devices xc7a35t_0]
+refresh_hw_device -update_hw_probes false [lindex [get_hw_devices xc7a35t_0] 0]
+set_property PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property FULL_PROBES.FILE {} [get_hw_devices xc7a35t_0]
+set_property PROGRAM.FILE {D:/2026 group/ee2026_project/FDP/FDP.runs/impl_1/main.bit} [get_hw_devices xc7a35t_0]
+program_hw_devices [get_hw_devices xc7a35t_0]
+refresh_hw_device [lindex [get_hw_devices xc7a35t_0] 0]
+close_hw
+archive_project {D:/2026 group/ee2026_project/FDP.xpr.zip} -temp_dir {D:/2026 group/ee2026_project/FDP/.Xil/Vivado-30920-DESKTOP-QJ09AV3} -force -include_local_ip_cache -include_config_settings

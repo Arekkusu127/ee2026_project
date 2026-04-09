@@ -1,6 +1,78 @@
 `timescale 1ns / 1ps
+module girl(
+    input game_started,
+    input [4:0] x_pos,
+    input [4:0] y_pos,
+    output  [15:0] pixel,
+    output visible
+);
+    reg [15:0] rom [0:899];  // 900 pixels, each 16 bits
+    initial begin
+    `ifdef SYNTHESIS
+        $readmemb("../../FDP.srcs/sources_1/new/girl.bin", rom);
+    `else
+        $readmemb("../../../../FDP.srcs/sources_1/new/girl.bin", rom);
+    `endif
+    end
+    wire [9:0] addr = y_pos * 30 + x_pos; // 30 pixels per row
+    assign pixel = rom[addr];
+    wire [4:0] r = pixel[15:11];
+    wire [5:0] g = pixel[10:5];
+    wire [4:0] b = pixel[4:0];
+    assign visible = !( (r >= 28) && (g >= 45) && (g <= 55) && (b >= 28) );
+endmodule
+module background(
+    input CLOCK,
+    input game_started,
+    input frame_begin,
+    input  [6:0] hcount,      // 0-95  (7 bits)
+    input  [5:0] vcount,      // 0-63  (6 bits)
+    output [15:0] pixel
+);
+    reg [15:0] rom0 [0:6143];  // 6144 pixels, each 16 bits
+    reg [15:0] rom1 [0:6143];
+    reg [15:0] rom2 [0:6143];
+    
 
+    initial begin
+    `ifdef SYNTHESIS
+        $readmemb("../../FDP.srcs/sources_1/new/bg_rom0.bin", rom0);
+        $readmemb("../../FDP.srcs/sources_1/new/bg_rom1.bin", rom1);
+        $readmemb("../../FDP.srcs/sources_1/new/bg_rom2.bin", rom2);
+    `else
+        $readmemb("../../../../FDP.srcs/sources_1/new/bg_rom0.bin", rom0);
+        $readmemb("../../../../FDP.srcs/sources_1/new/bg_rom1.bin", rom1);
+        $readmemb("../../../../FDP.srcs/sources_1/new/bg_rom2.bin", rom2);
+    `endif
+        
+    end
+
+    // Address = vcount * 96 + hcount
+    // 96 = 64 + 32 = (1<<6) + (1<<5)
+    wire [12:0] addr = ({vcount, 6'd0} + {vcount, 5'd0}) + {6'd0, hcount};
+
+    reg [7:0] frame_cnt;     // 8 bits enough for up to 255 frames
+    reg bg_sel;
+    
+
+    always @(posedge CLOCK) begin
+        if (frame_begin) begin
+            if (frame_cnt == 8'd202) begin   // 0..202 = 203 frames
+                frame_cnt <= 0;
+                bg_sel <= ~bg_sel;
+            end else begin
+                frame_cnt <= frame_cnt + 1;
+            end
+        end    
+    end
+
+    wire [15:0] auto_pixel = bg_sel? rom1[addr]:rom0[addr]; 
+    assign pixel = game_started ? rom2[addr] : auto_pixel;
+
+endmodule
 module render(
+    input         CLOCK,
+    input         frame_begin,
     input  [6:0]  pix_x,
     input  [5:0]  pix_y,
     input         game_started,
@@ -20,7 +92,7 @@ module render(
     input  [5:0]  terrain_height,
     input         victory,
     input         defeat,
-    input         trail_pixel,       // NEW: trail data from trail_buffer
+    input         trail_pixel,
     output reg [15:0] pixel_data
 );
 
@@ -71,55 +143,61 @@ module render(
     localparam C_VICTORY      = 16'hFFE0;
     localparam C_DEFEAT       = 16'hF800;
     localparam C_MENU_BG      = 16'h0000;
-    localparam C_MENU_TEXT     = 16'hFFFF;
-    localparam C_MENU_ACCENT   = 16'hFFE0;
-    localparam C_TRAIL        = 16'h7BEF;  // NEW: light grey for trail dots
+    localparam C_MENU_TEXT    = 16'hFFFF;
+    localparam C_MENU_ACCENT  = 16'hFFE0;
+    localparam C_TRAIL        = 16'h7BEF;
+
+    // ============================================================
+    // BACKGROUND INTEGRATION
+    // ============================================================
+    wire [15:0] bg_pixel;
+    wire bg_led_unused;
+
+    background bg_inst (
+        .CLOCK(CLOCK),
+        .game_started(game_started),   // standby animation when 0, gameplay bg when 1
+        .frame_begin(frame_begin),
+        .hcount(pix_x),
+        .vcount(pix_y),
+        .pixel(bg_pixel)
+    );
 
     // ============================================================
     // START MENU
     // ============================================================
-    wire menu_border = (!game_started) && (
-        (pix_x >= 7'd10 && pix_x <= 7'd85 && (pix_y == 6'd10 || pix_y == 6'd50)) ||
-        ((pix_x == 7'd10 || pix_x == 7'd85) && pix_y >= 6'd10 && pix_y <= 6'd50)
-    );
+//    wire menu_border = (!game_started) && (
+//        (pix_x >= 7'd10 && pix_x <= 7'd85 && (pix_y == 6'd10 || pix_y == 6'd50)) ||
+//        ((pix_x == 7'd10 || pix_x == 7'd85) && pix_y >= 6'd10 && pix_y <= 6'd50)
+//    );
     
-    wire menu_title = (!game_started) && 
-        (pix_x >= 7'd20 && pix_x <= 7'd75 && pix_y >= 6'd18 && pix_y <= 6'd26);
+//    wire menu_title = (!game_started) &&
+//        (pix_x >= 7'd20 && pix_x <= 7'd75 && pix_y >= 6'd18 && pix_y <= 6'd26);
     
-    wire menu_press = (!game_started) &&
-        (pix_x >= 7'd30 && pix_x <= 7'd65 && pix_y >= 6'd35 && pix_y <= 6'd43);
+//    wire menu_press = (!game_started) &&
+//        (pix_x >= 7'd30 && pix_x <= 7'd65 && pix_y >= 6'd35 && pix_y <= 6'd43);
 
-    wire menu_cross = (!game_started) && (
-        ((pix_x == 7'd48) && pix_y >= 6'd28 && pix_y <= 6'd32) ||
-        (pix_y == 6'd30 && pix_x >= 7'd46 && pix_x <= 7'd50)
-    );
+//    wire menu_cross = (!game_started) && (
+//        ((pix_x == 7'd48) && pix_y >= 6'd28 && pix_y <= 6'd32) ||
+//        (pix_y == 6'd30 && pix_x >= 7'd46 && pix_x <= 7'd50)
+//    );
 
     // ============================================================
-    // AIMING CIRCLE - radius 30 pixels
+    // AIMING CIRCLE
     // ============================================================
     localparam AIM_R = 30;
-    // R^2 = 900, (R-1)^2 = 841
-    localparam [15:0] AIM_R_SQ_OUT = 16'd920;   // outer bound (R^2 + tolerance)
-    localparam [15:0] AIM_R_SQ_IN  = 16'd841;   // inner bound (R-1)^2
+    localparam [15:0] AIM_R_SQ_OUT = 16'd920;
+    localparam [15:0] AIM_R_SQ_IN  = 16'd841;
     
     wire signed [7:0] aim_dx = $signed({1'b0, pix_x}) - $signed({1'b0, px});
     wire signed [7:0] aim_dy = $signed({1'b0, pix_y}) - $signed({1'b0, py});
     wire [15:0] aim_dist_sq = aim_dx * aim_dx + aim_dy * aim_dy;
     
-    // Circle outline: between (R-1)^2 and R^2+tolerance
     wire aim_circle_outline = (game_phase == PH_AIM) && 
         (aim_dist_sq >= AIM_R_SQ_IN && aim_dist_sq <= AIM_R_SQ_OUT);
 
-    // Aim direction dot at radius proportional to power
-    // dot at distance = power * 30 / 15 = power * 2 from center
     wire [13:0] cos_approx = (7'd90 - player_angle) * 8'd3;
     wire [13:0] sin_approx = player_angle * 8'd3;
     
-    // Scale: power * 2 pixels out, direction from cos/sin approx
-    // cos_approx max = 270 (at angle 0), sin_approx max = 270 (at angle 90)
-    // dot_dx = power * 2 * cos_approx / 270
-    // ≈ power * cos_approx / 135
-    // ≈ (power * cos_approx) >> 7  (divide by 128, close to 135)
     wire signed [15:0] dot_dx_raw = ($signed({1'b0, player_power}) * $signed({2'b0, cos_approx}));
     wire signed [15:0] dot_dy_raw = ($signed({1'b0, player_power}) * $signed({2'b0, sin_approx}));
     wire signed [7:0] aim_dot_dx = dot_dx_raw >>> 7;
@@ -128,7 +206,6 @@ module render(
     wire [6:0] aim_dot_x = (px + aim_dot_dx[6:0]);
     wire [5:0] aim_dot_y = (py + aim_dot_dy[5:0]);
     
-    // Aim dot: 3x3 pixel
     wire aim_dot_hit = (game_phase == PH_AIM) &&
         (pix_x >= aim_dot_x - 7'd1) && (pix_x <= aim_dot_x + 7'd1) &&
         (pix_y >= aim_dot_y - 6'd1) && (pix_y <= aim_dot_y + 6'd1) &&
@@ -200,11 +277,26 @@ module render(
     // ============================================================
     // ENTITY SPRITES
     // ============================================================
-    wire player_hit = (px >= {3'd0, phw}) && (py >= {3'd0, phh}) &&
-                      (pix_x >= px - {3'd0, phw}) && (pix_x <= px + {3'd0, phw}) &&
-                      (pix_y >= py - {3'd0, phh}) && (pix_y <= py + {3'd0, phh});
-    wire player_dead = (php == 6'd0);
-    wire [15:0] player_color = player_dead ? C_PLAYER_DEAD : C_PLAYER;
+    wire [6:0] girl_left = (px >= 7'd15) ? (px - 7'd15) : 7'd0;
+    wire [5:0] girl_top  = (py >= 6'd15) ? (py - 6'd15) : 6'd0;
+    
+    // FIXED: Full width subtraction first
+    wire [6:0] local_xg_full = pix_x - girl_left;
+    wire [5:0] local_yg_full = pix_y - girl_top;
+    wire [4:0] local_xg = local_xg_full[4:0];
+    wire [4:0] local_yg = local_yg_full[4:0];
+    
+    wire in_girl = (pix_x >= girl_left) && (pix_x < girl_left + 7'd30) && (pix_y >= girl_top) && (pix_y < girl_top + 6'd30);
+    wire [15:0] girl_pixel;
+    wire girl_vis;
+
+    girl girl_inst(
+        .game_started(game_started),
+        .x_pos(local_xg),
+        .y_pos(local_yg),
+        .pixel(girl_pixel),
+        .visible(girl_vis)
+    );
 
     wire enemy0_vis = (enemy_entity_0 != 46'd0);
     wire enemy0_hit = enemy0_vis &&
@@ -228,41 +320,27 @@ module render(
                       (pix_y >= ey2 - {3'd0, ehh2}) && (pix_y <= ey2 + {3'd0, ehh2});
     wire [15:0] enemy2_color = !enemy_alive[2] ? C_MINION_DEAD : C_MINION;
 
-    // Projectile: 2x2
     wire proj_hit = proj_active &&
                     (pix_x >= proj_x) && (pix_x <= proj_x + 7'd1) &&
                     (pix_y >= proj_y) && (pix_y <= proj_y + 6'd1);
 
-    // Trail: dotted pattern - only show every other pixel for dotted effect
     wire trail_dotted = trail_pixel && ((pix_x[0] ^ pix_y[0]) == 1'b0);
 
-    // Terrain
     wire terrain_hit = (pix_y >= terrain_height);
 
-    // Gameover banner
     wire gameover_banner = (game_phase == PH_GAMEOVER) &&
                            (pix_x >= 7'd20) && (pix_x <= 7'd75) &&
                            (pix_y >= 6'd25) && (pix_y <= 6'd38);
 
-    // Sky gradient
-    wire [4:0] sky_b = 5'd20 - {1'b0, pix_y[5:2]};
-    wire [15:0] sky_color = {5'd1, 6'd2, sky_b};
+//    wire [4:0] sky_b = 5'd20 - {1'b0, pix_y[5:2]};
+//    wire [15:0] sky_color = {5'd1, 6'd2, sky_b};
 
     // ============================================================
     // PRIORITY MUX
     // ============================================================
-    always @(*) begin
+always @(*) begin
         if (!game_started) begin
-            if (menu_cross)
-                pixel_data = C_AIM_DOT;
-            else if (menu_title)
-                pixel_data = C_MENU_ACCENT;
-            else if (menu_press)
-                pixel_data = C_MENU_TEXT;
-            else if (menu_border)
-                pixel_data = C_MENU_ACCENT;
-            else
-                pixel_data = C_MENU_BG;
+            pixel_data = bg_pixel;
         end
         else if (gameover_banner)
             pixel_data = victory ? C_VICTORY : C_DEFEAT;
@@ -276,8 +354,8 @@ module render(
             pixel_data = C_HP_FILL;
         else if (player_hp_bar_region || e0_hp_bar_region || e1_hp_bar_region || e2_hp_bar_region)
             pixel_data = C_HP_EMPTY;
-        else if (player_hit)
-            pixel_data = player_color;
+        else if (in_girl && girl_vis)
+            pixel_data = girl_pixel;
         else if (enemy0_hit)
             pixel_data = enemy0_color;
         else if (enemy1_hit)
@@ -286,10 +364,8 @@ module render(
             pixel_data = enemy2_color;
         else if (trail_dotted)
             pixel_data = C_TRAIL;
-        else if (terrain_hit)
-            pixel_data = C_TERRAIN;
         else
-            pixel_data = sky_color;
+            pixel_data = bg_pixel;
     end
 
 endmodule

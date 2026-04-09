@@ -23,25 +23,25 @@ create_project -in_memory -part xc7a35tcpg236-1
 set_param project.singleFileAddWarning.threshold 0
 set_param project.compositeFile.enableAutoGeneration 0
 set_param synth.vivado.isSynthRun true
-set_property webtalk.parent_dir C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.cache/wt [current_project]
-set_property parent.project_path C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.xpr [current_project]
+set_property webtalk.parent_dir C:/Users/jiayu/Documents/GitHub/FDP/FDP.cache/wt [current_project]
+set_property parent.project_path C:/Users/jiayu/Documents/GitHub/FDP/FDP.xpr [current_project]
 set_property default_lib xil_defaultlib [current_project]
 set_property target_language Verilog [current_project]
-set_property ip_output_repo c:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.cache/ip [current_project]
+set_property ip_output_repo c:/Users/jiayu/Documents/GitHub/FDP/FDP.cache/ip [current_project]
 set_property ip_cache_permissions {read write} [current_project]
 read_verilog -library xil_defaultlib {
-  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/imports/Oled_Display.v
-  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/imports/clk_divider.v
-  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/cos_lut.v
-  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/debounce.v
-  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/game_state.v
-  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/lfsr16.v
-  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/render.v
-  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/sin_lut.v
-  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/ss_display.v
-  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/terrain_ram.v
-  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/trail_buffer.v
-  C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/sources_1/new/main.v
+  C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/imports/Oled_Display.v
+  C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/imports/clk_divider.v
+  C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/cos_lut.v
+  C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/debounce.v
+  C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/game_state.v
+  C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/lfsr16.v
+  C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/render.v
+  C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/sin_lut.v
+  C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/ss_display.v
+  C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/terrain_ram.v
+  C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/trail_buffer.v
+  C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/sources_1/new/main.v
 }
 # Mark all dcp files as not used in implementation to prevent them from being
 # stitched into the results of this synthesis run. Any black boxes in the
@@ -51,8 +51,8 @@ read_verilog -library xil_defaultlib {
 foreach dcp [get_files -quiet -all -filter file_type=="Design\ Checkpoint"] {
   set_property used_in_implementation false $dcp
 }
-read_xdc C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc
-set_property used_in_implementation false [get_files C:/Users/jiayu/Documents/GitHub/ee2026_project/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc]
+read_xdc C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc
+set_property used_in_implementation false [get_files C:/Users/jiayu/Documents/GitHub/FDP/FDP.srcs/constrs_1/new/my_xdc.xdc]
 
 set_param ips.enableIPCacheLiteLoad 0
 close [open __synthesis_is_running__ w]
