@@ -1,4 +1,5 @@
 `timescale 1ns / 1ps
+
 module girl(
     input game_started,
     input [4:0] x_pos,
@@ -21,18 +22,18 @@ module girl(
     wire [4:0] b = pixel[4:0];
     assign visible = !( (r >= 28) && (g >= 45) && (g <= 55) && (b >= 28) );
 endmodule
+
 module background(
     input CLOCK,
     input game_started,
     input frame_begin,
-    input  [6:0] hcount,      // 0-95  (7 bits)
-    input  [5:0] vcount,      // 0-63  (6 bits)
+    input  [6:0] hcount,
+    input  [5:0] vcount,
     output [15:0] pixel
 );
-    reg [15:0] rom0 [0:6143];  // 6144 pixels, each 16 bits
+    reg [15:0] rom0 [0:6143];
     reg [15:0] rom1 [0:6143];
     reg [15:0] rom2 [0:6143];
-    
 
     initial begin
     `ifdef SYNTHESIS
@@ -44,20 +45,16 @@ module background(
         $readmemb("../../../../FDP.srcs/sources_1/new/bg_rom1.bin", rom1);
         $readmemb("../../../../FDP.srcs/sources_1/new/bg_rom2.bin", rom2);
     `endif
-        
     end
 
-    // Address = vcount * 96 + hcount
-    // 96 = 64 + 32 = (1<<6) + (1<<5)
     wire [12:0] addr = ({vcount, 6'd0} + {vcount, 5'd0}) + {6'd0, hcount};
 
-    reg [7:0] frame_cnt;     // 8 bits enough for up to 255 frames
+    reg [7:0] frame_cnt;
     reg bg_sel;
-    
 
     always @(posedge CLOCK) begin
         if (frame_begin) begin
-            if (frame_cnt == 8'd202) begin   // 0..202 = 203 frames
+            if (frame_cnt == 8'd202) begin
                 frame_cnt <= 0;
                 bg_sel <= ~bg_sel;
             end else begin
@@ -66,10 +63,10 @@ module background(
         end    
     end
 
-    wire [15:0] auto_pixel = bg_sel? rom1[addr]:rom0[addr]; 
+    wire [15:0] auto_pixel = bg_sel ? rom1[addr] : rom0[addr]; 
     assign pixel = game_started ? rom2[addr] : auto_pixel;
-
 endmodule
+
 module render(
     input         CLOCK,
     input         frame_begin,
@@ -93,6 +90,9 @@ module render(
     input         victory,
     input         defeat,
     input         trail_pixel,
+    input         arc_pixel,
+    input  [6:0]  reticle_x,
+    input  [5:0]  reticle_y,
     output reg [15:0] pixel_data
 );
 
@@ -128,9 +128,7 @@ module render(
     wire [5:0] ehp2 = enemy_entity_2[43:38];
 
     // Colors (RGB565)
-    localparam C_TERRAIN      = 16'h07E0;
     localparam C_PLAYER       = 16'hFFE0;
-    localparam C_PLAYER_DEAD  = 16'h8410;
     localparam C_MINION       = 16'hF800;
     localparam C_MINION_DEAD  = 16'h8410;
     localparam C_BOSS         = 16'hF81F;
@@ -138,24 +136,20 @@ module render(
     localparam C_PROJ         = 16'hFFFF;
     localparam C_HP_FILL      = 16'h07E0;
     localparam C_HP_EMPTY     = 16'h4208;
-    localparam C_AIM_CIRCLE   = 16'hFFFF;
-    localparam C_AIM_DOT      = 16'hF800;
+    localparam C_RETICLE      = 16'hF800;  // Red crosshair
+    localparam C_ARC_PREVIEW  = 16'h07FF;  // Cyan dotted arc
     localparam C_VICTORY      = 16'hFFE0;
     localparam C_DEFEAT       = 16'hF800;
-    localparam C_MENU_BG      = 16'h0000;
-    localparam C_MENU_TEXT    = 16'hFFFF;
-    localparam C_MENU_ACCENT  = 16'hFFE0;
     localparam C_TRAIL        = 16'h7BEF;
 
     // ============================================================
     // BACKGROUND INTEGRATION
     // ============================================================
     wire [15:0] bg_pixel;
-    wire bg_led_unused;
 
     background bg_inst (
         .CLOCK(CLOCK),
-        .game_started(game_started),   // standby animation when 0, gameplay bg when 1
+        .game_started(game_started),
         .frame_begin(frame_begin),
         .hcount(pix_x),
         .vcount(pix_y),
@@ -163,53 +157,25 @@ module render(
     );
 
     // ============================================================
-    // START MENU
+    // RETICLE CROSSHAIR (replaces aim circle)
     // ============================================================
-//    wire menu_border = (!game_started) && (
-//        (pix_x >= 7'd10 && pix_x <= 7'd85 && (pix_y == 6'd10 || pix_y == 6'd50)) ||
-//        ((pix_x == 7'd10 || pix_x == 7'd85) && pix_y >= 6'd10 && pix_y <= 6'd50)
-//    );
-    
-//    wire menu_title = (!game_started) &&
-//        (pix_x >= 7'd20 && pix_x <= 7'd75 && pix_y >= 6'd18 && pix_y <= 6'd26);
-    
-//    wire menu_press = (!game_started) &&
-//        (pix_x >= 7'd30 && pix_x <= 7'd65 && pix_y >= 6'd35 && pix_y <= 6'd43);
+    // Draw a small crosshair at reticle position during AIM phase
+    wire reticle_h_bar = (game_phase == PH_AIM) &&
+        (pix_y == reticle_y) &&
+        (pix_x >= reticle_x - 7'd2) && (pix_x <= reticle_x + 7'd2) &&
+        (reticle_x >= 7'd2) && (reticle_x <= 7'd93);
 
-//    wire menu_cross = (!game_started) && (
-//        ((pix_x == 7'd48) && pix_y >= 6'd28 && pix_y <= 6'd32) ||
-//        (pix_y == 6'd30 && pix_x >= 7'd46 && pix_x <= 7'd50)
-//    );
+    wire reticle_v_bar = (game_phase == PH_AIM) &&
+        (pix_x == reticle_x) &&
+        (pix_y >= reticle_y - 6'd2) && (pix_y <= reticle_y + 6'd2) &&
+        (reticle_y >= 6'd2) && (reticle_y <= 6'd61);
+
+    wire reticle_hit = reticle_h_bar || reticle_v_bar;
 
     // ============================================================
-    // AIMING CIRCLE
+    // ARC PREVIEW (precalculated dotted arc during AIM)
     // ============================================================
-    localparam AIM_R = 30;
-    localparam [15:0] AIM_R_SQ_OUT = 16'd920;
-    localparam [15:0] AIM_R_SQ_IN  = 16'd841;
-    
-    wire signed [7:0] aim_dx = $signed({1'b0, pix_x}) - $signed({1'b0, px});
-    wire signed [7:0] aim_dy = $signed({1'b0, pix_y}) - $signed({1'b0, py});
-    wire [15:0] aim_dist_sq = aim_dx * aim_dx + aim_dy * aim_dy;
-    
-    wire aim_circle_outline = (game_phase == PH_AIM) && 
-        (aim_dist_sq >= AIM_R_SQ_IN && aim_dist_sq <= AIM_R_SQ_OUT);
-
-    wire [13:0] cos_approx = (7'd90 - player_angle) * 8'd3;
-    wire [13:0] sin_approx = player_angle * 8'd3;
-    
-    wire signed [15:0] dot_dx_raw = ($signed({1'b0, player_power}) * $signed({2'b0, cos_approx}));
-    wire signed [15:0] dot_dy_raw = ($signed({1'b0, player_power}) * $signed({2'b0, sin_approx}));
-    wire signed [7:0] aim_dot_dx = dot_dx_raw >>> 7;
-    wire signed [7:0] aim_dot_dy = -(dot_dy_raw >>> 7);
-    
-    wire [6:0] aim_dot_x = (px + aim_dot_dx[6:0]);
-    wire [5:0] aim_dot_y = (py + aim_dot_dy[5:0]);
-    
-    wire aim_dot_hit = (game_phase == PH_AIM) &&
-        (pix_x >= aim_dot_x - 7'd1) && (pix_x <= aim_dot_x + 7'd1) &&
-        (pix_y >= aim_dot_y - 6'd1) && (pix_y <= aim_dot_y + 6'd1) &&
-        (aim_dot_x >= 7'd1) && (aim_dot_y >= 6'd1);
+    wire arc_dotted = arc_pixel && (game_phase == PH_AIM) && ((pix_x[0] ^ pix_y[0]) == 1'b0);
 
     // ============================================================
     // HP BARS
@@ -280,7 +246,6 @@ module render(
     wire [6:0] girl_left = (px >= 7'd15) ? (px - 7'd15) : 7'd0;
     wire [5:0] girl_top  = (py >= 6'd15) ? (py - 6'd15) : 6'd0;
     
-    // FIXED: Full width subtraction first
     wire [6:0] local_xg_full = pix_x - girl_left;
     wire [5:0] local_yg_full = pix_y - girl_top;
     wire [4:0] local_xg = local_xg_full[4:0];
@@ -326,28 +291,23 @@ module render(
 
     wire trail_dotted = trail_pixel && ((pix_x[0] ^ pix_y[0]) == 1'b0);
 
-    wire terrain_hit = (pix_y >= terrain_height);
+    // NO terrain rendering - terrain_hit removed
 
     wire gameover_banner = (game_phase == PH_GAMEOVER) &&
                            (pix_x >= 7'd20) && (pix_x <= 7'd75) &&
                            (pix_y >= 6'd25) && (pix_y <= 6'd38);
 
-//    wire [4:0] sky_b = 5'd20 - {1'b0, pix_y[5:2]};
-//    wire [15:0] sky_color = {5'd1, 6'd2, sky_b};
-
     // ============================================================
     // PRIORITY MUX
     // ============================================================
-always @(*) begin
+    always @(*) begin
         if (!game_started) begin
             pixel_data = bg_pixel;
         end
         else if (gameover_banner)
             pixel_data = victory ? C_VICTORY : C_DEFEAT;
-        else if (aim_dot_hit)
-            pixel_data = C_AIM_DOT;
-        else if (aim_circle_outline)
-            pixel_data = C_AIM_CIRCLE;
+        else if (reticle_hit)
+            pixel_data = C_RETICLE;
         else if (proj_hit)
             pixel_data = C_PROJ;
         else if (player_hp_filled || e0_hp_filled || e1_hp_filled || e2_hp_filled)
@@ -362,10 +322,12 @@ always @(*) begin
             pixel_data = enemy1_color;
         else if (enemy2_hit)
             pixel_data = enemy2_color;
+        else if (arc_dotted)
+            pixel_data = C_ARC_PREVIEW;
         else if (trail_dotted)
             pixel_data = C_TRAIL;
         else
-            pixel_data = bg_pixel;
+            pixel_data = bg_pixel;  // Background shows through - no terrain
     end
 
 endmodule

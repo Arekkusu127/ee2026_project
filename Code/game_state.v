@@ -1,13 +1,24 @@
 `timescale 1ns / 1ps
 
+/*
+Entity data format (46 bits):
+[45:44] TYPE
+[43:38] HP
+[37:32] DEF
+[31:26] ATK
+[25:20] MP
+[19:13] PosX
+[12:7]  PosY
+[6:3]   half_width
+[2:0]   half_height
+*/
+
 module game_state(
     input         clk,
     input         rst,
     input         fire_btn,
     input         angle_up,
     input         angle_down,
-    input         power_up,
-    input         power_down,
     input         move_left,
     input         move_right,
     input         confirm_aim,
@@ -21,6 +32,11 @@ module game_state(
     output reg        trail_wr_en,
     output reg [6:0]  trail_wr_x,
     output reg [5:0]  trail_wr_y,
+    // Precalculated arc buffer outputs
+    output reg        arc_clear,
+    output reg        arc_wr_en,
+    output reg [6:0]  arc_wr_x,
+    output reg [5:0]  arc_wr_y,
     output reg [2:0]  game_phase,
     output [6:0]      player_x,
     output [5:0]      player_y,
@@ -60,8 +76,6 @@ module game_state(
     localparam TYPE_BOSS   = 2'b10;
 
     // ---- Aim circle radius ----
-    // Radius = 20 pixels, radius^2 = 400
-    localparam [9:0] AIM_RADIUS    = 10'd20;
     localparam [9:0] AIM_RADIUS_SQ = 10'd400;
 
     function [45:0] pack_entity;
@@ -112,9 +126,25 @@ module game_state(
     reg [8:0] real_hp_player;
     reg [8:0] real_hp_enemy [0:2];
 
+    // ---- Projectile physics (fixed point: 8 fractional bits) ----
     reg signed [20:0] proj_fx, proj_fy;
     reg signed [15:0] proj_vx, proj_vy;
-    localparam signed [15:0] GRAVITY = 16'sd30;
+
+    // Gravity tuned so that at power=15, angle=45, horizontal range = 96 pixels
+    // Physics: range = vx * 2 * vy / g (in pixel units)
+    // With sin/cos LUT scaled by 256:
+    //   vx_real = power * cos(45) / 256 * VELOCITY_SCALE
+    //   vy_real = power * sin(45) / 256 * VELOCITY_SCALE
+    // At 45 deg: sin=cos=181 (from LUT)
+    // vx = 15 * 181 * SCALE / 256, range = 2*vx*vy/g = 96
+    // We use: vx = power * cos_val (no extra shift), gravity chosen to match
+    // range = 2 * (P*C) * (P*S) / (G * 256) = 96 at P=15, C=S=181
+    // 2 * 15*181 * 15*181 / (G*256) = 96
+    // 2 * 2715 * 2715 / (G*256) = 96
+    // 14742450 / (G*256) = 96
+    // G = 14742450 / (96*256) = 14742450 / 24576 ≈ 600
+    // Per tick gravity increment = 600 (in fixed point with 8 frac bits)
+    localparam signed [15:0] GRAVITY = 16'sd600;
 
     reg [2:0] trail_tick_cnt;
 
@@ -158,8 +188,16 @@ module game_state(
     reg [6:0]  move_target_x;
     reg [1:0]  fire_step;
 
+    // ---- Precalculated arc state ----
+    reg [1:0]  arc_calc_state;  // 0=idle, 1=calculating, 2=done
+    reg [6:0]  arc_step;
+    reg signed [20:0] arc_fx, arc_fy;
+    reg signed [15:0] arc_vx, arc_vy;
+    reg        arc_needs_update;
+    reg [6:0]  last_reticle_x;
+    reg [5:0]  last_reticle_y;
+
     // ---- Reticle circle constraint ----
-    // Candidate positions after button press
     wire [6:0] cand_x_up    = reticle_x;
     wire [5:0] cand_y_up    = (reticle_y > 6'd0)  ? reticle_y - 6'd1 : 6'd0;
     wire [6:0] cand_x_down  = reticle_x;
@@ -169,61 +207,38 @@ module game_state(
     wire [6:0] cand_x_right = (reticle_x < 7'd95) ? reticle_x + 7'd1 : 7'd95;
     wire [5:0] cand_y_right = reticle_y;
 
-    // Player center for distance calculation
     wire [6:0] pcx = ent_px(player_entity);
     wire [5:0] pcy = ent_py(player_entity);
 
-    // Signed deltas for each candidate
     wire signed [7:0] dx_up    = $signed({1'b0, cand_x_up})    - $signed({1'b0, pcx});
-    wire signed [7:0] dy_up    = $signed({1'b0, cand_y_up})    - $signed({2'b0, pcy});
+    wire signed [7:0] dy_up    = $signed({2'b0, cand_y_up})    - $signed({2'b0, pcy});
     wire signed [7:0] dx_down  = $signed({1'b0, cand_x_down})  - $signed({1'b0, pcx});
-    wire signed [7:0] dy_down  = $signed({1'b0, cand_y_down})  - $signed({2'b0, pcy});
+    wire signed [7:0] dy_down  = $signed({2'b0, cand_y_down})  - $signed({2'b0, pcy});
     wire signed [7:0] dx_left  = $signed({1'b0, cand_x_left})  - $signed({1'b0, pcx});
-    wire signed [7:0] dy_left  = $signed({1'b0, cand_y_left})  - $signed({2'b0, pcy});
+    wire signed [7:0] dy_left  = $signed({2'b0, cand_y_left})  - $signed({2'b0, pcy});
     wire signed [7:0] dx_right = $signed({1'b0, cand_x_right}) - $signed({1'b0, pcx});
-    wire signed [7:0] dy_right = $signed({1'b0, cand_y_right}) - $signed({2'b0, pcy});
+    wire signed [7:0] dy_right = $signed({2'b0, cand_y_right}) - $signed({2'b0, pcy});
 
-    // Distance squared for each candidate (dx^2 + dy^2)
     wire [15:0] dsq_up    = dx_up    * dx_up    + dy_up    * dy_up;
     wire [15:0] dsq_down  = dx_down  * dx_down  + dy_down  * dy_down;
     wire [15:0] dsq_left  = dx_left  * dx_left  + dy_left  * dy_left;
     wire [15:0] dsq_right = dx_right * dx_right + dy_right * dy_right;
 
-    // Allow move only if within radius
     wire allow_up    = (dsq_up    <= {6'd0, AIM_RADIUS_SQ});
     wire allow_down  = (dsq_down  <= {6'd0, AIM_RADIUS_SQ});
     wire allow_left  = (dsq_left  <= {6'd0, AIM_RADIUS_SQ});
     wire allow_right = (dsq_right <= {6'd0, AIM_RADIUS_SQ});
 
-    // ---- Current reticle delta from player (for fire computation) ----
+    // ---- Current reticle delta from player ----
     wire signed [7:0] ret_dx = $signed({1'b0, reticle_x}) - $signed({1'b0, pcx});
-    wire signed [7:0] ret_dy = $signed({1'b0, reticle_y}) - $signed({2'b0, pcy});
+    wire signed [7:0] ret_dy = $signed({2'b0, reticle_y}) - $signed({2'b0, pcy});
 
     wire [6:0] abs_dx = ret_dx[7] ? (~ret_dx[6:0] + 7'd1) : ret_dx[6:0];
     wire [5:0] abs_dy = ret_dy[7] ? (~ret_dy[5:0] + 6'd1) : ret_dy[5:0];
 
-    // Euclidean distance squared (current)
     wire [15:0] ret_dsq = ret_dx * ret_dx + ret_dy * ret_dy;
 
-    // Power mapped from distance squared (0..400 → 1..15)
-    // power = dsq * 15 / 400 ≈ dsq / 27, clamped to [1,15]
-    // Simpler: use sqrt approximation or threshold table
-    // dsq thresholds for power levels: dsq = (radius * power/15)^2
-    // power  1: dsq ≈   2  (r=1.3)
-    // power  2: dsq ≈   7  (r=2.7)
-    // power  3: dsq ≈  16  (r=4.0)
-    // power  4: dsq ≈  28  (r=5.3)
-    // power  5: dsq ≈  44  (r=6.7)
-    // power  6: dsq ≈  64  (r=8.0)
-    // power  7: dsq ≈  87  (r=9.3)
-    // power  8: dsq ≈ 114  (r=10.7)
-    // power  9: dsq ≈ 144  (r=12.0)
-    // power 10: dsq ≈ 178  (r=13.3)
-    // power 11: dsq ≈ 215  (r=14.7)
-    // power 12: dsq ≈ 256  (r=16.0)
-    // power 13: dsq ≈ 300  (r=17.3)
-    // power 14: dsq ≈ 348  (r=18.7)
-    // power 15: dsq ≈ 400  (r=20.0)
+    // Power mapped from distance (0..400 → 1..15)
     wire [3:0] computed_power = (ret_dsq >= 16'd348) ? 4'd15 :
                                 (ret_dsq >= 16'd300) ? 4'd14 :
                                 (ret_dsq >= 16'd256) ? 4'd13 :
@@ -240,8 +255,6 @@ module game_state(
                                 (ret_dsq >= 16'd2)   ? 4'd2  : 4'd1;
 
     // ---- Angle from reticle position ----
-    // atan2 approximation using tan-threshold comparisons
-    // We compare abs_dy * 64 against abs_dx * (tan(angle)*64)
     wire [12:0] dy_64     = {7'b0, abs_dy} << 6;
     wire [12:0] dx_tan10  = {6'b0, abs_dx} * 7'd11;
     wire [12:0] dx_tan20  = {6'b0, abs_dx} * 7'd23;
@@ -265,11 +278,11 @@ module game_state(
                                     (dy_64 >= dx_tan10)           ? 7'd15 :
                                                                     7'd5;
 
-    wire reticle_above = ret_dy[7];
+    wire reticle_above = ret_dy[7]; // negative dy means above
     wire reticle_right = !ret_dx[7];
     wire [6:0] launch_elevation = reticle_above ? computed_angle_raw : 7'd0;
 
-    // ---- Skill decoder ----
+    // ---- Skill decoder (integrated from projectile.v) ----
     always @(*) begin
         case (skill_sel)
             4'd0:  begin skill_damage = 6'd15; skill_blast = 4'd2; skill_energy_cost = 4'd0;  end
@@ -297,32 +310,21 @@ module game_state(
         input [5:0] y1;
         input [6:0] x2;
         input [5:0] y2;
-        reg [6:0] dx;
-        reg [5:0] dy;
+        reg [6:0] adx;
+        reg [5:0] ady;
         begin
-            dx = (x1 > x2) ? (x1 - x2) : (x2 - x1);
-            dy = (y1 > y2) ? (y1 - y2) : (y2 - y1);
-            manhattan = {1'b0, dx} + {2'b00, dy};
+            adx = (x1 > x2) ? (x1 - x2) : (x2 - x1);
+            ady = (y1 > y2) ? (y1 - y2) : (y2 - y1);
+            manhattan = {1'b0, adx} + {2'b00, ady};
         end
     endfunction
 
+    // ---- Terrain generation (integrated from map_generation.v) ----
+    // Flat terrain at row 50 for all columns (visual terrain removed,
+    // but we still use the RAM for entity ground placement)
     reg [5:0] computed_terrain;
     always @(*) begin
-        if (!current_round) begin
-            if (init_col < 7'd24)
-                computed_terrain = 6'd48 - (init_col[2:0] < 4 ? init_col[2:0] : (3'd7 - init_col[2:0]));
-            else if (init_col < 7'd48)
-                computed_terrain = 6'd44 - (init_col[2:0] < 4 ? init_col[2:0] : (3'd7 - init_col[2:0]));
-            else if (init_col < 7'd72)
-                computed_terrain = 6'd46 - (init_col[2:0] < 4 ? init_col[2:0] : (3'd7 - init_col[2:0]));
-            else
-                computed_terrain = 6'd48 - (init_col[2:0] < 4 ? init_col[2:0] : (3'd7 - init_col[2:0]));
-        end else begin
-            if (init_col >= 7'd40 && init_col <= 7'd56)
-                computed_terrain = 6'd56;
-            else
-                computed_terrain = 6'd48;
-        end
+        computed_terrain = 6'd50;
     end
 
     always @(*) begin
@@ -376,6 +378,21 @@ module game_state(
             reticle_x         <= 7'd30;
             reticle_y         <= 6'd20;
 
+            arc_clear         <= 0;
+            arc_wr_en         <= 0;
+            arc_wr_x          <= 0;
+            arc_wr_y          <= 0;
+            arc_calc_state    <= 2'd0;
+            arc_step          <= 0;
+            arc_fx            <= 0;
+            arc_fy            <= 0;
+            arc_vx            <= 0;
+            arc_vy            <= 0;
+            arc_needs_update  <= 0;
+            last_reticle_x    <= 7'd0;
+            last_reticle_y    <= 6'd0;
+
+            // Stats integrated from stats.v
             player_entity  <= pack_entity(TYPE_PLAYER, 6'd50, 6'd5, 6'd25, 6'd12, 7'd10, 6'd0, 4'd3, 3'd3);
             enemy_entity_0 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd55, 6'd0, 4'd2, 3'd3);
             enemy_entity_1 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd70, 6'd0, 4'd2, 3'd3);
@@ -388,9 +405,81 @@ module game_state(
             terrain_wr_en <= 0;
             trail_clear   <= 0;
             trail_wr_en   <= 0;
+            arc_clear     <= 0;
+            arc_wr_en     <= 0;
 
             if (hit_event && tick_30hz)
                 hit_event <= 0;
+
+            // ---- Precalculated arc computation (runs in background during AIM phase) ----
+            if (game_phase == PH_AIM && is_player_turn) begin
+                if (reticle_x != last_reticle_x || reticle_y != last_reticle_y) begin
+                    arc_needs_update <= 1;
+                    last_reticle_x   <= reticle_x;
+                    last_reticle_y   <= reticle_y;
+                end
+
+                case (arc_calc_state)
+                2'd0: begin // idle - check if update needed
+                    if (arc_needs_update) begin
+                        arc_clear      <= 1;
+                        arc_calc_state <= 2'd1;
+                        arc_step       <= 0;
+                        arc_needs_update <= 0;
+                        // Initialize arc trajectory from player position
+                        arc_fx <= {ent_px(player_entity), 8'd128};
+                        arc_fy <= {ent_py(player_entity), 8'd0};
+                        // Compute velocity based on current reticle
+                        if (reticle_right)
+                            arc_vx <= $signed({1'b0, computed_power}) * $signed({1'b0, cos_val});
+                        else
+                            arc_vx <= -($signed({1'b0, computed_power}) * $signed({1'b0, cos_val}));
+                        if (reticle_above)
+                            arc_vy <= -($signed({1'b0, computed_power}) * $signed({1'b0, sin_val}));
+                        else
+                            arc_vy <= $signed({1'b0, computed_power}) * $signed({1'b0, sin_val});
+                    end
+                end
+                2'd1: begin // calculating - step through arc
+                    if (arc_step < 7'd120) begin
+                        arc_fx <= arc_fx + {{5{arc_vx[15]}}, arc_vx};
+                        arc_fy <= arc_fy + {{5{arc_vy[15]}}, arc_vy};
+                        arc_vy <= arc_vy + GRAVITY;
+                        arc_step <= arc_step + 1;
+
+                        // Write pixel if in bounds
+                        if (!arc_fx[20] && arc_fx[14:8] < 7'd96 &&
+                            !arc_fy[20] && arc_fy[13:8] < 6'd64) begin
+                            // Write every other step for dotted look
+                            if (arc_step[1:0] == 2'b00) begin
+                                arc_wr_en <= 1;
+                                arc_wr_x  <= arc_fx[14:8];
+                                arc_wr_y  <= arc_fy[13:8];
+                            end
+                        end
+
+                        // Stop if out of bounds
+                        if (arc_fx[20] || arc_fx[14:8] >= 7'd96 ||
+                            arc_fy[20] || arc_fy[13:8] >= 6'd63) begin
+                            arc_calc_state <= 2'd2;
+                        end
+                    end else begin
+                        arc_calc_state <= 2'd2;
+                    end
+                end
+                2'd2: begin // done
+                    if (arc_needs_update)
+                        arc_calc_state <= 2'd0;
+                end
+                default: arc_calc_state <= 2'd0;
+                endcase
+            end else begin
+                // Not in AIM phase - reset arc state
+                if (game_phase != PH_AIM) begin
+                    arc_calc_state <= 2'd0;
+                    arc_needs_update <= 0;
+                end
+            end
 
             case (game_phase)
 
@@ -473,8 +562,7 @@ module game_state(
                         if (confirm_aim || player_fuel == 4'd0) begin
                             game_phase <= PH_AIM;
                             move_step  <= 0;
-                            // Initialize reticle: 14 pixels to the right, 14 up from player
-                            // (inside circle of radius 20: 14^2 + 14^2 = 392 < 400)
+                            // Initialize reticle above and to the right of player
                             if (ent_px(player_entity) + 7'd14 <= 7'd95)
                                 reticle_x <= ent_px(player_entity) + 7'd14;
                             else
@@ -483,6 +571,13 @@ module game_state(
                                 reticle_y <= ent_py(player_entity) - 6'd14;
                             else
                                 reticle_y <= 6'd0;
+                            // Force arc recalculation
+                            arc_needs_update <= 1;
+                            last_reticle_x   <= 7'h7F; // invalid to force mismatch
+                            last_reticle_y   <= 6'h3F;
+                            arc_calc_state   <= 2'd0;
+                            // Set LUT angle for arc calculation
+                            lut_angle <= launch_elevation;
                         end else if (move_left && player_fuel > 0) begin
                             if (ent_px(player_entity) > 7'd1) begin
                                 move_target_x <= ent_px(player_entity) - 7'd1;
@@ -517,20 +612,27 @@ module game_state(
             // ===== AIM =====
             PH_AIM: begin
                 if (is_player_turn) begin
-                    // Move reticle with circle constraint
+                    // btnU moves reticle up
                     if (angle_up && allow_up)
                         reticle_y <= cand_y_up;
+                    // btnD moves reticle down
                     if (angle_down && allow_down)
                         reticle_y <= cand_y_down;
+                    // btnL moves reticle left
                     if (move_left && allow_left)
                         reticle_x <= cand_x_left;
+                    // btnR moves reticle right
                     if (move_right && allow_right)
                         reticle_x <= cand_x_right;
 
-                    // Update displayed angle and power
+                    // Update LUT angle for arc preview
+                    lut_angle <= launch_elevation;
+
+                    // Update displayed angle and power from reticle position
                     player_angle <= launch_elevation;
                     player_power <= computed_power;
 
+                    // btnC confirms aim and fires
                     if (fire_btn) begin
                         if (player_energy >= skill_energy_cost) begin
                             player_energy  <= player_energy - skill_energy_cost;
@@ -540,6 +642,7 @@ module game_state(
                             lut_ready      <= 0;
                             fire_step      <= 0;
                             trail_clear    <= 1;
+                            arc_clear      <= 1;  // Clear arc preview on fire
                         end
                     end
                 end else begin
@@ -587,15 +690,16 @@ module game_state(
                         proj_fx <= {ent_px(player_entity), 8'd128};
                         proj_fy <= {ent_py(player_entity), 8'd0};
 
+                        // Use same velocity formula as arc preview
                         if (reticle_right)
-                            proj_vx <= ($signed({1'b0, computed_power}) * $signed({1'b0, cos_val})) >>> 1;
+                            proj_vx <= $signed({1'b0, computed_power}) * $signed({1'b0, cos_val});
                         else
-                            proj_vx <= -(($signed({1'b0, computed_power}) * $signed({1'b0, cos_val})) >>> 1);
+                            proj_vx <= -($signed({1'b0, computed_power}) * $signed({1'b0, cos_val}));
 
                         if (reticle_above)
-                            proj_vy <= -(($signed({1'b0, computed_power}) * $signed({1'b0, sin_val})) >>> 1);
+                            proj_vy <= -($signed({1'b0, computed_power}) * $signed({1'b0, sin_val}));
                         else
-                            proj_vy <= (($signed({1'b0, computed_power}) * $signed({1'b0, sin_val})) >>> 1);
+                            proj_vy <= $signed({1'b0, computed_power}) * $signed({1'b0, sin_val});
 
                         proj_x <= ent_px(player_entity);
                         proj_y <= ent_py(player_entity);
@@ -624,8 +728,8 @@ module game_state(
                                 proj_fy <= 0;
                             end
                         endcase
-                        proj_vx <= -(($signed({1'b0, ai_power}) * $signed({1'b0, cos_val})) >>> 1);
-                        proj_vy <= -(($signed({1'b0, ai_power}) * $signed({1'b0, sin_val})) >>> 1);
+                        proj_vx <= -($signed({1'b0, ai_power}) * $signed({1'b0, cos_val}));
+                        proj_vy <= -($signed({1'b0, ai_power}) * $signed({1'b0, sin_val}));
                     end
 
                     game_phase <= PH_ANIMATE;
@@ -636,6 +740,7 @@ module game_state(
             end
 
             // ===== ANIMATE =====
+            // No terrain collision - projectile flies until hitting entity or going OOB
             PH_ANIMATE: begin
                 if (tick_30hz) begin
                     proj_fx <= proj_fx + {{5{proj_vx[15]}}, proj_vx};
@@ -648,9 +753,6 @@ module game_state(
                     if (!proj_fy[20] && proj_fy[13:8] < 6'd64)
                         proj_y <= proj_fy[13:8];
 
-                    if (!proj_fx[20])
-                        terrain_rd_addr_a <= proj_fx[14:8];
-
                     trail_tick_cnt <= trail_tick_cnt + 1;
                     if (trail_tick_cnt[0] == 1'b0) begin
                         if (!proj_fx[20] && proj_fx[14:8] < 7'd96 &&
@@ -661,16 +763,45 @@ module game_state(
                         end
                     end
 
+                    // Check OOB (no terrain collision)
                     if (proj_fx[20] || proj_fx[14:8] >= 7'd96 ||
-                        (!proj_fy[20] && proj_fy[13:8] >= 6'd63)) begin
+                        proj_fy[20] || (!proj_fy[20] && proj_fy[13:8] >= 6'd63) ||
+                        anim_ticks > 10'd300) begin
                         proj_active  <= 0;
                         game_phase   <= PH_RESOLVE;
                         resolve_step <= 0;
                     end
-                    else if (anim_ticks > 1 && !proj_fy[20] && proj_fy[13:8] >= terrain_rd_data_a) begin
-                        proj_active  <= 0;
-                        game_phase   <= PH_RESOLVE;
-                        resolve_step <= 0;
+
+                    // Check entity hit during animation for player shots
+                    if (is_player_turn && !proj_fx[20] && !proj_fy[20]) begin
+                        if (enemy_alive[0] && manhattan(proj_fx[14:8], proj_fy[13:8],
+                            ent_px(enemy_entity_0), ent_py(enemy_entity_0)) <= {4'd0, skill_blast}) begin
+                            proj_active  <= 0;
+                            game_phase   <= PH_RESOLVE;
+                            resolve_step <= 0;
+                        end
+                        if (enemy_alive[1] && manhattan(proj_fx[14:8], proj_fy[13:8],
+                            ent_px(enemy_entity_1), ent_py(enemy_entity_1)) <= {4'd0, skill_blast}) begin
+                            proj_active  <= 0;
+                            game_phase   <= PH_RESOLVE;
+                            resolve_step <= 0;
+                        end
+                        if (enemy_alive[2] && manhattan(proj_fx[14:8], proj_fy[13:8],
+                            ent_px(enemy_entity_2), ent_py(enemy_entity_2)) <= {4'd0, skill_blast}) begin
+                            proj_active  <= 0;
+                            game_phase   <= PH_RESOLVE;
+                            resolve_step <= 0;
+                        end
+                    end
+
+                    // Check entity hit for enemy shots
+                    if (!is_player_turn && !proj_fx[20] && !proj_fy[20]) begin
+                        if (manhattan(proj_fx[14:8], proj_fy[13:8],
+                            ent_px(player_entity), ent_py(player_entity)) <= 8'd5) begin
+                            proj_active  <= 0;
+                            game_phase   <= PH_RESOLVE;
+                            resolve_step <= 0;
+                        end
                     end
                 end
             end
@@ -752,31 +883,8 @@ module game_state(
                     enemy_entity_2 <= set_hp(enemy_entity_2,
                         (real_hp_enemy[2] > 9'd63) ? 6'd63 : real_hp_enemy[2][5:0]);
 
-                    blast_dx     <= -$signed({4'd0, skill_blast});
-                    resolve_step <= 3'd1;
-                end
-                3'd1: begin
-                    if (blast_dx <= $signed({4'd0, skill_blast})) begin
-                        if (($signed({1'b0, proj_x}) + blast_dx) >= 0 &&
-                            ($signed({1'b0, proj_x}) + blast_dx) < 96) begin
-                            terrain_rd_addr_a <= proj_x + blast_dx[6:0];
-                            resolve_step <= 3'd2;
-                        end else begin
-                            blast_dx     <= blast_dx + 1;
-                            resolve_step <= 3'd1;
-                        end
-                    end else begin
-                        resolve_step <= 3'd3;
-                    end
-                end
-                3'd2: begin
-                    if (terrain_rd_data_a < 6'd62) begin
-                        terrain_wr_en   <= 1;
-                        terrain_wr_addr <= proj_x + blast_dx[6:0];
-                        terrain_wr_data <= terrain_rd_data_a + 6'd1;
-                    end
-                    blast_dx     <= blast_dx + 1;
-                    resolve_step <= 3'd1;
+                    // Skip terrain deformation (terrain removed visually)
+                    resolve_step <= 3'd3;
                 end
                 3'd3: begin
                     if (real_hp_player == 9'd0) begin

@@ -1,14 +1,5 @@
 `timescale 1ns / 1ps
 
-//////////////////////////////////////////////////////////////////////////////////
-//
-//  STUDENT P NAME: Wang Wanru
-//  STUDENT Q NAME: Wei Haowen
-//  STUDENT R NAME: Qiang Jiayuan
-//  STUDENT S NAME: Sun Shaohan
-// 
-//////////////////////////////////////////////////////////////////////////////////
-
 module main(
     input         clk,
     input         btnC,
@@ -139,6 +130,29 @@ module main(
         .trail_rd_data(trail_rd_data)
     );
 
+    // ---- Precalculated arc buffer signals ----
+    wire        arc_rd_data;
+    wire        arc_clear;
+    wire        arc_wr_en;
+    wire [6:0]  arc_wr_x;
+    wire [5:0]  arc_wr_y;
+
+    trail_buffer arc_inst (
+        .clk(clk),
+        .reset(game_rst),
+        .trail_clear(arc_clear),
+        .trail_wr_en(arc_wr_en),
+        .trail_wr_x(arc_wr_x),
+        .trail_wr_y(arc_wr_y),
+        .trail_rd_x(pix_x),
+        .trail_rd_y(pix_y),
+        .trail_rd_data(arc_rd_data)
+    );
+
+    // ---- Reticle signals ----
+    wire [6:0] reticle_x;
+    wire [5:0] reticle_y;
+
     // ---- Skill selection ----
     reg [3:0] skill_sel;
     always @(*) begin
@@ -161,14 +175,15 @@ module main(
     end
 
     // ---- Game state FSM ----
+    wire        hit_event;
+    wire [7:0]  hit_damage;
+
     game_state game_fsm (
         .clk(clk),
         .rst(game_rst),
         .fire_btn(game_fire),
         .angle_up(game_au),
         .angle_down(game_ad),
-        .power_up(game_ar),
-        .power_down(game_ad),
         .move_left(game_al),
         .move_right(game_ar),
         .confirm_aim(game_fire),
@@ -182,6 +197,10 @@ module main(
         .trail_wr_en(trail_wr_en),
         .trail_wr_x(trail_wr_x),
         .trail_wr_y(trail_wr_y),
+        .arc_clear(arc_clear),
+        .arc_wr_en(arc_wr_en),
+        .arc_wr_x(arc_wr_x),
+        .arc_wr_y(arc_wr_y),
         .game_phase(game_phase),
         .player_x(player_x),
         .player_y(player_y),
@@ -202,14 +221,14 @@ module main(
         .victory(victory),
         .defeat(defeat),
         .hit_event(hit_event),
-        .hit_damage(hit_damage)
+        .hit_damage(hit_damage),
+        .reticle_x(reticle_x),
+        .reticle_y(reticle_y)
     );
 
-    wire        hit_event;
-    wire [7:0]  hit_damage;
-
     // ---- OLED pixel pipeline ----
-    wire sending_pixels, sample_pixel;
+    wire        frame_begin;
+    wire        sending_pixels, sample_pixel;
     wire [12:0] pixel_index;
     wire [15:0] pixel_data;
 
@@ -241,6 +260,9 @@ module main(
         .victory(victory),
         .defeat(defeat),
         .trail_pixel(trail_rd_data),
+        .arc_pixel(arc_rd_data),
+        .reticle_x(reticle_x),
+        .reticle_y(reticle_y),
         .pixel_data(pixel_data)
     );
 
@@ -262,16 +284,14 @@ module main(
         .pmoden(oled_pmoden)
     );
 
-    // ---- LED output: Fuel (10 LEDs) or Energy bar ----
+    // ---- LED output ----
     reg [15:0] led_out;
     always @(*) begin
         if (!game_started) begin
             led_out = 16'hFFFF;
         end else if (game_phase == 3'd7) begin
-            // MOVE phase: fuel gauge using LEDs [9:0] only (10 LEDs)
-            // LED[i] on if fuel > i
             case (player_fuel)
-                4'd10: led_out = 16'h03FF;  // bits [9:0] all on
+                4'd10: led_out = 16'h03FF;
                 4'd9:  led_out = 16'h01FF;
                 4'd8:  led_out = 16'h00FF;
                 4'd7:  led_out = 16'h007F;
