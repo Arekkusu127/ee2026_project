@@ -8,15 +8,11 @@ module girl(
 );
     reg [15:0] rom [0:899];  // 900 pixels, each 16 bits
     initial begin
-<<<<<<< HEAD
     `ifdef SYNTHESIS
         $readmemb("../../FDP.srcs/sources_1/new/girl.bin", rom);
     `else
         $readmemb("../../../../FDP.srcs/sources_1/new/girl.bin", rom);
     `endif
-=======
-        $readmemb("D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/girl.bin", rom);
->>>>>>> cd8f577c5d136d0deecf0881cad7463ecd1607f3
     end
     wire [9:0] addr = y_pos * 30 + x_pos; // 30 pixels per row
     assign pixel = rom[addr];
@@ -39,7 +35,6 @@ module background(
     
 
     initial begin
-<<<<<<< HEAD
     `ifdef SYNTHESIS
         $readmemb("../../FDP.srcs/sources_1/new/bg_rom0.bin", rom0);
         $readmemb("../../FDP.srcs/sources_1/new/bg_rom1.bin", rom1);
@@ -49,11 +44,6 @@ module background(
         $readmemb("../../../../FDP.srcs/sources_1/new/bg_rom1.bin", rom1);
         $readmemb("../../../../FDP.srcs/sources_1/new/bg_rom2.bin", rom2);
     `endif
-=======
-        $readmemb("D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/bg_rom0.bin", rom0);
-        $readmemb("D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/bg_rom1.bin", rom1);
-        $readmemb("D:/2026 group/ee2026_project/FDP/FDP.srcs/sources_1/new/bg_rom2.bin", rom2);
->>>>>>> cd8f577c5d136d0deecf0881cad7463ecd1607f3
         
     end
 

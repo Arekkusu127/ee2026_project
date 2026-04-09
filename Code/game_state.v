@@ -1,18 +1,5 @@
 `timescale 1ns / 1ps
 
-/*
-Entity data format (46 bits):
-[45:44] TYPE
-[43:38] HP
-[37:32] DEF
-[31:26] ATK
-[25:20] MP
-[19:13] PosX
-[12:7]  PosY
-[6:3]   half_width
-[2:0]   half_height
-*/
-
 module game_state(
     input         clk,
     input         rst,
@@ -25,18 +12,15 @@ module game_state(
     input         move_right,
     input         confirm_aim,
     input  [3:0]  skill_sel,
-    // terrain RAM port A
     output reg [6:0]  terrain_rd_addr_a,
     input      [5:0]  terrain_rd_data_a,
     output reg        terrain_wr_en,
     output reg [6:0]  terrain_wr_addr,
     output reg [5:0]  terrain_wr_data,
-    // trail buffer control
     output reg        trail_clear,
     output reg        trail_wr_en,
     output reg [6:0]  trail_wr_x,
     output reg [5:0]  trail_wr_y,
-    // outputs
     output reg [2:0]  game_phase,
     output [6:0]      player_x,
     output [5:0]      player_y,
@@ -57,10 +41,11 @@ module game_state(
     output reg        victory,
     output reg        defeat,
     output reg        hit_event,
-    output reg [7:0]  hit_damage
+    output reg [7:0]  hit_damage,
+    output reg [6:0]  reticle_x,
+    output reg [5:0]  reticle_y
 );
 
-    // Game phases
     localparam PH_INIT     = 3'd0;
     localparam PH_AIM      = 3'd1;
     localparam PH_FIRE     = 3'd2;
@@ -73,6 +58,11 @@ module game_state(
     localparam TYPE_PLAYER = 2'b00;
     localparam TYPE_MINION = 2'b01;
     localparam TYPE_BOSS   = 2'b10;
+
+    // ---- Aim circle radius ----
+    // Radius = 20 pixels, radius^2 = 400
+    localparam [9:0] AIM_RADIUS    = 10'd20;
+    localparam [9:0] AIM_RADIUS_SQ = 10'd400;
 
     function [45:0] pack_entity;
         input [1:0]  etype;
@@ -119,20 +109,15 @@ module game_state(
     assign player_x = ent_px(player_entity);
     assign player_y = ent_py(player_entity);
 
-    // Internal real HP tracking
     reg [8:0] real_hp_player;
     reg [8:0] real_hp_enemy [0:2];
 
-    // Fixed-point projectile (x256)
     reg signed [20:0] proj_fx, proj_fy;
     reg signed [15:0] proj_vx, proj_vy;
-    // INCREASED GRAVITY for visible parabola
     localparam signed [15:0] GRAVITY = 16'sd30;
 
-    // Trail write counter - only write every N ticks for dotted effect
     reg [2:0] trail_tick_cnt;
 
-    // 30 Hz tick
     reg [21:0] tick_cnt;
     wire tick_30hz = (tick_cnt == 22'd3_333_333);
     always @(posedge clk or posedge rst) begin
@@ -144,56 +129,145 @@ module game_state(
             tick_cnt <= tick_cnt + 1;
     end
 
-    // LFSR
     wire [15:0] rng;
     lfsr16 lfsr_inst (.clk(clk), .rst(rst), .rng(rng));
 
-    // Sin/Cos LUT
     reg  [6:0] lut_angle;
     wire [8:0] sin_val, cos_val;
     sin_lut sin_inst (.angle(lut_angle), .sin_val(sin_val));
     cos_lut cos_inst (.angle(lut_angle), .cos_val(cos_val));
 
-    // Turn management
     reg        is_player_turn;
     reg [1:0]  current_enemy_idx;
 
-    // Skill data
     reg [5:0]  skill_damage;
     reg [3:0]  skill_blast;
     reg [3:0]  skill_energy_cost;
 
-    // Animation tick counter
     reg [9:0]  anim_ticks;
-
-    // AI think delay
     reg [5:0]  ai_delay;
-
-    // Terrain init counter
     reg [6:0]  init_col;
     reg [2:0]  init_step;
-
-    // Resolve sub-state
     reg [2:0]  resolve_step;
     reg signed [7:0] blast_dx;
-
-    // Fire direction
     reg        fire_dir_right;
-
-    // AI computed angle/power
     reg [6:0]  ai_angle;
     reg [3:0]  ai_power;
-
-    // LUT ready flag
     reg        lut_ready;
-
-    // Movement
     reg [1:0]  move_step;
     reg [6:0]  move_target_x;
+    reg [1:0]  fire_step;
 
-    always @(*) begin
-        player_hp = real_hp_player;
-    end
+    // ---- Reticle circle constraint ----
+    // Candidate positions after button press
+    wire [6:0] cand_x_up    = reticle_x;
+    wire [5:0] cand_y_up    = (reticle_y > 6'd0)  ? reticle_y - 6'd1 : 6'd0;
+    wire [6:0] cand_x_down  = reticle_x;
+    wire [5:0] cand_y_down  = (reticle_y < 6'd63) ? reticle_y + 6'd1 : 6'd63;
+    wire [6:0] cand_x_left  = (reticle_x > 7'd0)  ? reticle_x - 7'd1 : 7'd0;
+    wire [5:0] cand_y_left  = reticle_y;
+    wire [6:0] cand_x_right = (reticle_x < 7'd95) ? reticle_x + 7'd1 : 7'd95;
+    wire [5:0] cand_y_right = reticle_y;
+
+    // Player center for distance calculation
+    wire [6:0] pcx = ent_px(player_entity);
+    wire [5:0] pcy = ent_py(player_entity);
+
+    // Signed deltas for each candidate
+    wire signed [7:0] dx_up    = $signed({1'b0, cand_x_up})    - $signed({1'b0, pcx});
+    wire signed [7:0] dy_up    = $signed({1'b0, cand_y_up})    - $signed({2'b0, pcy});
+    wire signed [7:0] dx_down  = $signed({1'b0, cand_x_down})  - $signed({1'b0, pcx});
+    wire signed [7:0] dy_down  = $signed({1'b0, cand_y_down})  - $signed({2'b0, pcy});
+    wire signed [7:0] dx_left  = $signed({1'b0, cand_x_left})  - $signed({1'b0, pcx});
+    wire signed [7:0] dy_left  = $signed({1'b0, cand_y_left})  - $signed({2'b0, pcy});
+    wire signed [7:0] dx_right = $signed({1'b0, cand_x_right}) - $signed({1'b0, pcx});
+    wire signed [7:0] dy_right = $signed({1'b0, cand_y_right}) - $signed({2'b0, pcy});
+
+    // Distance squared for each candidate (dx^2 + dy^2)
+    wire [15:0] dsq_up    = dx_up    * dx_up    + dy_up    * dy_up;
+    wire [15:0] dsq_down  = dx_down  * dx_down  + dy_down  * dy_down;
+    wire [15:0] dsq_left  = dx_left  * dx_left  + dy_left  * dy_left;
+    wire [15:0] dsq_right = dx_right * dx_right + dy_right * dy_right;
+
+    // Allow move only if within radius
+    wire allow_up    = (dsq_up    <= {6'd0, AIM_RADIUS_SQ});
+    wire allow_down  = (dsq_down  <= {6'd0, AIM_RADIUS_SQ});
+    wire allow_left  = (dsq_left  <= {6'd0, AIM_RADIUS_SQ});
+    wire allow_right = (dsq_right <= {6'd0, AIM_RADIUS_SQ});
+
+    // ---- Current reticle delta from player (for fire computation) ----
+    wire signed [7:0] ret_dx = $signed({1'b0, reticle_x}) - $signed({1'b0, pcx});
+    wire signed [7:0] ret_dy = $signed({1'b0, reticle_y}) - $signed({2'b0, pcy});
+
+    wire [6:0] abs_dx = ret_dx[7] ? (~ret_dx[6:0] + 7'd1) : ret_dx[6:0];
+    wire [5:0] abs_dy = ret_dy[7] ? (~ret_dy[5:0] + 6'd1) : ret_dy[5:0];
+
+    // Euclidean distance squared (current)
+    wire [15:0] ret_dsq = ret_dx * ret_dx + ret_dy * ret_dy;
+
+    // Power mapped from distance squared (0..400 → 1..15)
+    // power = dsq * 15 / 400 ≈ dsq / 27, clamped to [1,15]
+    // Simpler: use sqrt approximation or threshold table
+    // dsq thresholds for power levels: dsq = (radius * power/15)^2
+    // power  1: dsq ≈   2  (r=1.3)
+    // power  2: dsq ≈   7  (r=2.7)
+    // power  3: dsq ≈  16  (r=4.0)
+    // power  4: dsq ≈  28  (r=5.3)
+    // power  5: dsq ≈  44  (r=6.7)
+    // power  6: dsq ≈  64  (r=8.0)
+    // power  7: dsq ≈  87  (r=9.3)
+    // power  8: dsq ≈ 114  (r=10.7)
+    // power  9: dsq ≈ 144  (r=12.0)
+    // power 10: dsq ≈ 178  (r=13.3)
+    // power 11: dsq ≈ 215  (r=14.7)
+    // power 12: dsq ≈ 256  (r=16.0)
+    // power 13: dsq ≈ 300  (r=17.3)
+    // power 14: dsq ≈ 348  (r=18.7)
+    // power 15: dsq ≈ 400  (r=20.0)
+    wire [3:0] computed_power = (ret_dsq >= 16'd348) ? 4'd15 :
+                                (ret_dsq >= 16'd300) ? 4'd14 :
+                                (ret_dsq >= 16'd256) ? 4'd13 :
+                                (ret_dsq >= 16'd215) ? 4'd12 :
+                                (ret_dsq >= 16'd178) ? 4'd11 :
+                                (ret_dsq >= 16'd144) ? 4'd10 :
+                                (ret_dsq >= 16'd114) ? 4'd9  :
+                                (ret_dsq >= 16'd87)  ? 4'd8  :
+                                (ret_dsq >= 16'd64)  ? 4'd7  :
+                                (ret_dsq >= 16'd44)  ? 4'd6  :
+                                (ret_dsq >= 16'd28)  ? 4'd5  :
+                                (ret_dsq >= 16'd16)  ? 4'd4  :
+                                (ret_dsq >= 16'd7)   ? 4'd3  :
+                                (ret_dsq >= 16'd2)   ? 4'd2  : 4'd1;
+
+    // ---- Angle from reticle position ----
+    // atan2 approximation using tan-threshold comparisons
+    // We compare abs_dy * 64 against abs_dx * (tan(angle)*64)
+    wire [12:0] dy_64     = {7'b0, abs_dy} << 6;
+    wire [12:0] dx_tan10  = {6'b0, abs_dx} * 7'd11;
+    wire [12:0] dx_tan20  = {6'b0, abs_dx} * 7'd23;
+    wire [12:0] dx_tan30  = {6'b0, abs_dx} * 7'd37;
+    wire [12:0] dx_tan40  = {6'b0, abs_dx} * 7'd54;
+    wire [12:0] dx_tan50  = {6'b0, abs_dx} * 7'd76;
+    wire [12:0] dx_tan60  = {6'b0, abs_dx} * 13'd111;
+    wire [12:0] dx_tan70  = {6'b0, abs_dx} * 13'd176;
+    wire [12:0] dx_tan80  = {6'b0, abs_dx} * 13'd362;
+
+    wire [6:0] computed_angle_raw = (abs_dx == 0 && abs_dy == 0) ? 7'd45 :
+                                    (abs_dx == 0)                 ? 7'd90 :
+                                    (abs_dy == 0)                 ? 7'd0  :
+                                    (dy_64 >= dx_tan80)           ? 7'd85 :
+                                    (dy_64 >= dx_tan70)           ? 7'd75 :
+                                    (dy_64 >= dx_tan60)           ? 7'd65 :
+                                    (dy_64 >= dx_tan50)           ? 7'd55 :
+                                    (dy_64 >= dx_tan40)           ? 7'd45 :
+                                    (dy_64 >= dx_tan30)           ? 7'd35 :
+                                    (dy_64 >= dx_tan20)           ? 7'd25 :
+                                    (dy_64 >= dx_tan10)           ? 7'd15 :
+                                                                    7'd5;
+
+    wire reticle_above = ret_dy[7];
+    wire reticle_right = !ret_dx[7];
+    wire [6:0] launch_elevation = reticle_above ? computed_angle_raw : 7'd0;
 
     // ---- Skill decoder ----
     always @(*) begin
@@ -218,7 +292,6 @@ module game_state(
         endcase
     end
 
-    // Manhattan distance
     function [7:0] manhattan;
         input [6:0] x1;
         input [5:0] y1;
@@ -233,7 +306,6 @@ module game_state(
         end
     endfunction
 
-    // Terrain height for init
     reg [5:0] computed_terrain;
     always @(*) begin
         if (!current_round) begin
@@ -251,6 +323,10 @@ module game_state(
             else
                 computed_terrain = 6'd48;
         end
+    end
+
+    always @(*) begin
+        player_hp = real_hp_player;
     end
 
     // ====== MAIN FSM ======
@@ -296,8 +372,10 @@ module game_state(
             trail_wr_x        <= 0;
             trail_wr_y        <= 0;
             trail_tick_cnt    <= 0;
+            fire_step         <= 0;
+            reticle_x         <= 7'd30;
+            reticle_y         <= 6'd20;
 
-            // HITBOX CHANGES: player hw=3, hh=3; minions hw=2, hh=3; boss hw=4, hh=4
             player_entity  <= pack_entity(TYPE_PLAYER, 6'd50, 6'd5, 6'd25, 6'd12, 7'd10, 6'd0, 4'd3, 3'd3);
             enemy_entity_0 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd55, 6'd0, 4'd2, 3'd3);
             enemy_entity_1 <= pack_entity(TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd70, 6'd0, 4'd2, 3'd3);
@@ -310,7 +388,7 @@ module game_state(
             terrain_wr_en <= 0;
             trail_clear   <= 0;
             trail_wr_en   <= 0;
-            
+
             if (hit_event && tick_30hz)
                 hit_event <= 0;
 
@@ -387,7 +465,7 @@ module game_state(
                 endcase
             end
 
-            // ===== MOVE PHASE =====
+            // ===== MOVE =====
             PH_MOVE: begin
                 if (is_player_turn) begin
                     case (move_step)
@@ -395,6 +473,16 @@ module game_state(
                         if (confirm_aim || player_fuel == 4'd0) begin
                             game_phase <= PH_AIM;
                             move_step  <= 0;
+                            // Initialize reticle: 14 pixels to the right, 14 up from player
+                            // (inside circle of radius 20: 14^2 + 14^2 = 392 < 400)
+                            if (ent_px(player_entity) + 7'd14 <= 7'd95)
+                                reticle_x <= ent_px(player_entity) + 7'd14;
+                            else
+                                reticle_x <= 7'd95;
+                            if (ent_py(player_entity) >= 6'd14)
+                                reticle_y <= ent_py(player_entity) - 6'd14;
+                            else
+                                reticle_y <= 6'd0;
                         end else if (move_left && player_fuel > 0) begin
                             if (ent_px(player_entity) > 7'd1) begin
                                 move_target_x <= ent_px(player_entity) - 7'd1;
@@ -429,18 +517,28 @@ module game_state(
             // ===== AIM =====
             PH_AIM: begin
                 if (is_player_turn) begin
-                    if (angle_up   && player_angle < 7'd90) player_angle <= player_angle + 1;
-                    if (angle_down && player_angle > 7'd0)  player_angle <= player_angle - 1;
-                    if (power_up   && player_power < 4'd15) player_power <= player_power + 1;
-                    if (power_down && player_power > 4'd1)  player_power <= player_power - 1;
+                    // Move reticle with circle constraint
+                    if (angle_up && allow_up)
+                        reticle_y <= cand_y_up;
+                    if (angle_down && allow_down)
+                        reticle_y <= cand_y_down;
+                    if (move_left && allow_left)
+                        reticle_x <= cand_x_left;
+                    if (move_right && allow_right)
+                        reticle_x <= cand_x_right;
+
+                    // Update displayed angle and power
+                    player_angle <= launch_elevation;
+                    player_power <= computed_power;
+
                     if (fire_btn) begin
                         if (player_energy >= skill_energy_cost) begin
-                            player_energy <= player_energy - skill_energy_cost;
-                            fire_dir_right <= 1;
-                            lut_angle      <= player_angle;
+                            player_energy  <= player_energy - skill_energy_cost;
+                            fire_dir_right <= reticle_right;
+                            lut_angle      <= launch_elevation;
                             game_phase     <= PH_FIRE;
                             lut_ready      <= 0;
-                            // Clear trail on new shot
+                            fire_step      <= 0;
                             trail_clear    <= 1;
                         end
                     end
@@ -457,8 +555,9 @@ module game_state(
                             ai_angle <= 7'd38 + {4'd0, rng[2:0]};
                             ai_power <= 4'd8  + {2'd0, rng[4:3]};
                         end
-                        game_phase <= PH_FIRE;
-                        lut_ready  <= 0;
+                        game_phase  <= PH_FIRE;
+                        lut_ready   <= 0;
+                        fire_step   <= 0;
                         trail_clear <= 1;
                     end
                 end
@@ -466,20 +565,20 @@ module game_state(
 
             // ===== FIRE =====
             PH_FIRE: begin
-                if (!lut_ready) begin
+                case (fire_step)
+                2'd0: begin
                     if (!is_player_turn) begin
-                        if (!current_round)
-                            lut_angle <= (ai_angle > 7'd55) ? 7'd55 : ai_angle;
-                        else
-                            lut_angle <= (ai_angle > 7'd45) ? 7'd45 : ai_angle;
                         if (!current_round) begin
+                            lut_angle <= (ai_angle > 7'd55) ? 7'd55 : ai_angle;
                             if (ai_power > 4'd9) ai_power <= 4'd9;
                         end else begin
+                            lut_angle <= (ai_angle > 7'd45) ? 7'd45 : ai_angle;
                             if (ai_power > 4'd11) ai_power <= 4'd11;
                         end
                     end
-                    lut_ready <= 1;
-                end else begin
+                    fire_step <= 2'd1;
+                end
+                2'd1: begin
                     proj_active    <= 1;
                     anim_ticks     <= 0;
                     trail_tick_cnt <= 0;
@@ -487,11 +586,19 @@ module game_state(
                     if (is_player_turn) begin
                         proj_fx <= {ent_px(player_entity), 8'd128};
                         proj_fy <= {ent_py(player_entity), 8'd0};
-                        // REDUCED SPEED: divide cos/sin by 2 via right shift
-                        proj_vx <= ($signed({1'b0, player_power}) * $signed({1'b0, cos_val})) >>> 1;
-                        proj_vy <= -(($signed({1'b0, player_power}) * $signed({1'b0, sin_val})) >>> 1);
-                        proj_x  <= ent_px(player_entity);
-                        proj_y  <= ent_py(player_entity);
+
+                        if (reticle_right)
+                            proj_vx <= ($signed({1'b0, computed_power}) * $signed({1'b0, cos_val})) >>> 1;
+                        else
+                            proj_vx <= -(($signed({1'b0, computed_power}) * $signed({1'b0, cos_val})) >>> 1);
+
+                        if (reticle_above)
+                            proj_vy <= -(($signed({1'b0, computed_power}) * $signed({1'b0, sin_val})) >>> 1);
+                        else
+                            proj_vy <= (($signed({1'b0, computed_power}) * $signed({1'b0, sin_val})) >>> 1);
+
+                        proj_x <= ent_px(player_entity);
+                        proj_y <= ent_py(player_entity);
                     end else begin
                         case (current_enemy_idx)
                             2'd0: begin
@@ -517,14 +624,15 @@ module game_state(
                                 proj_fy <= 0;
                             end
                         endcase
-                        // REDUCED SPEED for enemy too
                         proj_vx <= -(($signed({1'b0, ai_power}) * $signed({1'b0, cos_val})) >>> 1);
                         proj_vy <= -(($signed({1'b0, ai_power}) * $signed({1'b0, sin_val})) >>> 1);
                     end
 
                     game_phase <= PH_ANIMATE;
-                    lut_ready  <= 0;
+                    fire_step  <= 0;
                 end
+                default: fire_step <= 2'd0;
+                endcase
             end
 
             // ===== ANIMATE =====
@@ -543,7 +651,6 @@ module game_state(
                     if (!proj_fx[20])
                         terrain_rd_addr_a <= proj_fx[14:8];
 
-                    // Write trail every 2 ticks for dotted effect
                     trail_tick_cnt <= trail_tick_cnt + 1;
                     if (trail_tick_cnt[0] == 1'b0) begin
                         if (!proj_fx[20] && proj_fx[14:8] < 7'd96 &&
@@ -556,13 +663,13 @@ module game_state(
 
                     if (proj_fx[20] || proj_fx[14:8] >= 7'd96 ||
                         (!proj_fy[20] && proj_fy[13:8] >= 6'd63)) begin
-                        proj_active <= 0;
-                        game_phase  <= PH_RESOLVE;
+                        proj_active  <= 0;
+                        game_phase   <= PH_RESOLVE;
                         resolve_step <= 0;
                     end
                     else if (anim_ticks > 1 && !proj_fy[20] && proj_fy[13:8] >= terrain_rd_data_a) begin
-                        proj_active <= 0;
-                        game_phase  <= PH_RESOLVE;
+                        proj_active  <= 0;
+                        game_phase   <= PH_RESOLVE;
                         resolve_step <= 0;
                     end
                 end
@@ -677,10 +784,9 @@ module game_state(
                         game_phase <= PH_GAMEOVER;
                     end else if (enemy_alive == 3'b000) begin
                         if (!current_round) begin
-                            current_round   <= 1;
-                            player_energy   <= 4'd12;
+                            current_round <= 1;
+                            player_energy <= 4'd12;
                             player_entity[25:20] <= 6'd12;
-                            // Boss hitbox: hw=4, hh=4
                             enemy_entity_0 <= pack_entity(TYPE_BOSS, 6'd50, 6'd8, 6'd30, 6'd0, 7'd80, 6'd0, 4'd4, 3'd4);
                             enemy_entity_1 <= 46'd0;
                             enemy_entity_2 <= 46'd0;
@@ -741,7 +847,7 @@ module game_state(
 
             // ===== GAMEOVER =====
             PH_GAMEOVER: begin
-                // Stay here
+                // Stay
             end
 
             default: game_phase <= PH_INIT;
