@@ -38,5 +38,8 @@ module slime0(
 
     wire [6:0] addr = y_pos * 14 + {3'd0, x_pos};
     assign pixel = rom[addr];
-    assign visible = (pixel != 16'hffff);
+    wire [4:0] r = pixel[15:11];
+    wire [5:0] g = pixel[10:5];
+    wire [4:0] b = pixel[4:0];
+    assign visible = !( (r >= 25) && (g >= 55) && (b >= 25) );
 endmodule
