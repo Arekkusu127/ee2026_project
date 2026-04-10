@@ -280,6 +280,22 @@ module game_state(
     wire reticle_above = ret_dy[7];
     wire reticle_right = !ret_dx[7];
     wire [6:0] launch_elevation = reticle_above ? computed_angle_raw : 7'd0;
+function [5:0] scale_boss_hp_400_to_63;
+    input [8:0] hp9;
+    reg [14:0] scaled_num;
+    reg [5:0]  scaled_hp;
+    begin
+        if (hp9 >= 9'd400) begin
+            scale_boss_hp_400_to_63 = 6'd63;
+        end else if (hp9 == 9'd0) begin
+            scale_boss_hp_400_to_63 = 6'd0;
+        end else begin
+            scaled_num = hp9 * 7'd63;
+            scaled_hp  = scaled_num / 9'd400;
+            scale_boss_hp_400_to_63 = (scaled_hp == 6'd0) ? 6'd1 : scaled_hp;
+        end
+    end
+endfunction
 
     // ---- Skill decoder with skill types ----
     // Type 0: basic (energy 0-4), single projectile
@@ -1041,8 +1057,7 @@ module game_state(
                         (next_player_hp[8:2] > 6'd63) ? 6'd63 : next_player_hp[8:2]);
                     enemy_entity_0 <= set_hp(enemy_entity_0,
                         current_round
-                            ? ((next_enemy_hp0 >= 9'd400) ? 6'd63 :
-                            (next_enemy_hp0 * 6'd63) / 9'd400)
+                            ? scale_boss_hp_400_to_63(next_enemy_hp0)
                             : ((next_enemy_hp0 > 9'd63) ? 6'd63 : next_enemy_hp0[5:0]));
                     enemy_entity_1 <= set_hp(enemy_entity_1,
                         (next_enemy_hp1 > 9'd63) ? 6'd63 : next_enemy_hp1[5:0]);
