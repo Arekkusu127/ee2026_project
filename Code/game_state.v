@@ -193,8 +193,8 @@ module game_state(
     reg [8:0]  spread_dmg_boss;
 
     // ---- Explosive radius for skill types 2,3 ----
-    reg [3:0]  effective_blast;
-    reg [3:0] explosion_radius;
+    reg [4:0]  effective_blast;
+    reg [4:0] explosion_radius;
 
 
     // ---- Precalculated arc state ----
@@ -805,7 +805,7 @@ endfunction
                             endcase
                             proj_vx <= -($signed({1'b0, ai_power}) * $signed({1'b0, cos_val}));
                             proj_vy <= -($signed({1'b0, ai_power}) * $signed({1'b0, sin_val}));
-                            explosion_radius <= 4'd2;  // Enemy explosions are small
+                            explosion_radius <= 5'd2;  // Enemy explosions are small
                         end
             
                         game_phase <= PH_ANIMATE;
@@ -935,7 +935,7 @@ endfunction
                                     // Check slime 0
                                     if (enemy_alive[0]) begin
                                         if (manhattan(explosion_center_x, explosion_center_y, 
-                                                    slime0_x + 7'd7, slime_y + 6'd4) <= {4'd0, explosion_radius}) begin
+                                                    slime0_x + 7'd7, slime_y + 6'd4) <= {3'd0, explosion_radius}) begin
                                             if (next_enemy_hp0 <= {3'd0, fire_skill_damage}) begin
                                                 hit_event           <= 1'b1;
                                                 hit_damage          <= next_enemy_hp0[7:0];
@@ -951,7 +951,7 @@ endfunction
                                     // Check slime 1
                                     if (enemy_alive[1]) begin
                                         if (manhattan(explosion_center_x, explosion_center_y,
-                                                    slime1_x + 7'd7, slime_y + 6'd4) <= {4'd0, explosion_radius}) begin
+                                                    slime1_x + 7'd7, slime_y + 6'd4) <= {3'd0, explosion_radius}) begin
                                             if (next_enemy_hp1 <= {3'd0, fire_skill_damage}) begin
                                                 hit_event           <= 1'b1;
                                                 hit_damage          <= next_enemy_hp1[7:0];
@@ -968,7 +968,7 @@ endfunction
                                     // Check boss
                                     if (enemy_alive[0]) begin
                                         if (manhattan(explosion_center_x, explosion_center_y,
-                                                    BOSS_SPRITE_LEFT + 7'd20, BOSS_SPRITE_TOP + 6'd25) <= {4'd0, explosion_radius}) begin
+                                                    BOSS_SPRITE_LEFT + 7'd20, BOSS_SPRITE_TOP + 6'd25) <= {3'd0, explosion_radius}) begin
                                             if (next_enemy_hp0 <= {3'd0, fire_skill_damage}) begin
                                                 hit_event           <= 1'b1;
                                                 hit_damage          <= next_enemy_hp0[7:0];
