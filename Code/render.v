@@ -118,6 +118,20 @@ module render(
         .vcount(pix_y),
         .pixel(bg_pixel)
     );
+    
+    wire [15:0] victory_pixel;
+    victory victory_inst (
+        .hcount(pix_x),
+        .vcount(pix_y),
+        .pixel(victory_pixel)
+    );
+    
+    wire [15:0] defeat_pixel;
+    defeat defeat_inst (
+        .hcount(pix_x),
+        .vcount(pix_y),
+        .pixel(defeat_pixel)
+    );
 
     // ============================================================
     // RETICLE CROSSHAIR (replaces aim circle)
@@ -314,9 +328,7 @@ module render(
     wire trail_dotted = trail_pixel;
     // NO terrain rendering - terrain_hit removed
 
-    wire gameover_banner = (game_phase == PH_GAMEOVER) &&
-                           (pix_x >= 7'd20) && (pix_x <= 7'd75) &&
-                           (pix_y >= 6'd25) && (pix_y <= 6'd38);
+    wire gameover_banner = (game_phase == PH_GAMEOVER)
 
     // ============================================================
     // PRIORITY MUX
@@ -326,7 +338,7 @@ module render(
             pixel_data = bg_pixel;
         end
         else if (gameover_banner) begin
-            pixel_data = victory ? C_VICTORY : C_DEFEAT;
+            pixel_data = victory ? victory_pixel : defeat_pixel;
         end
         else if (boss_beam_hit) begin
             pixel_data = 16'hF800;
