@@ -191,12 +191,7 @@ module render(
         (pix_x >= boss_bar_left) && (pix_x <= boss_bar_right) &&
         (pix_y >= boss_bar_y0)   && (pix_y <= boss_bar_y1);
 
-    wire [4:0] boss_hp_fill_w =
-        (ehp0 >= 6'd50) ? 5'd24 :
-        (ehp0 >= 6'd40) ? 5'd19 :
-        (ehp0 >= 6'd30) ? 5'd14 :
-        (ehp0 >= 6'd20) ? 5'd10 :
-        (ehp0 >= 6'd10) ? 5'd5  : 5'd0;
+    wire [4:0] boss_hp_fill_w = (ehp0 * 5'd24) / 6'd63; // Scale boss HP (0-63) to bar width (0-24)
 
     wire boss_hp_filled =
         boss_hp_bar_region &&
@@ -328,7 +323,7 @@ module render(
     wire trail_dotted = trail_pixel;
     // NO terrain rendering - terrain_hit removed
 
-    wire gameover_banner = (game_phase == PH_GAMEOVER)
+    wire gameover_banner = (game_phase == PH_GAMEOVER);
 
     // ============================================================
     // PRIORITY MUX

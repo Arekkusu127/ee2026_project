@@ -1040,7 +1040,10 @@ module game_state(
                     player_entity  <= set_hp(player_entity,
                         (next_player_hp[8:2] > 6'd63) ? 6'd63 : next_player_hp[8:2]);
                     enemy_entity_0 <= set_hp(enemy_entity_0,
-                        (next_enemy_hp0 > 9'd63) ? 6'd63 : next_enemy_hp0[5:0]);
+                        current_round
+                            ? ((next_enemy_hp0 >= 9'd400) ? 6'd63 :
+                            (next_enemy_hp0 * 6'd63) / 9'd400)
+                            : ((next_enemy_hp0 > 9'd63) ? 6'd63 : next_enemy_hp0[5:0]));
                     enemy_entity_1 <= set_hp(enemy_entity_1,
                         (next_enemy_hp1 > 9'd63) ? 6'd63 : next_enemy_hp1[5:0]);
                     enemy_entity_2 <= 46'd0;
