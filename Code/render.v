@@ -103,7 +103,7 @@ module render(
     localparam C_VICTORY      = 16'hFFE0;
     localparam C_DEFEAT       = 16'hF800;
     localparam C_TRAIL        = 16'h7BEF;
-    //localparam C_SLIME        = 16'h07E0;
+
 
     // ============================================================
     // BACKGROUND INTEGRATION
@@ -191,7 +191,12 @@ module render(
         (pix_x >= boss_bar_left) && (pix_x <= boss_bar_right) &&
         (pix_y >= boss_bar_y0)   && (pix_y <= boss_bar_y1);
 
-    wire [4:0] boss_hp_fill_w = (ehp0 * 5'd24) / 6'd63; // Scale boss HP (0-63) to bar width (0-24)
+    wire [4:0] boss_hp_fill_w =
+        (ehp0 >= 6'd50) ? 5'd24 :
+        (ehp0 >= 6'd40) ? 5'd19 :
+        (ehp0 >= 6'd30) ? 5'd14 :
+        (ehp0 >= 6'd20) ? 5'd10 :
+        (ehp0 >= 6'd10) ? 5'd5  : 5'd0;
 
     wire boss_hp_filled =
         boss_hp_bar_region &&
