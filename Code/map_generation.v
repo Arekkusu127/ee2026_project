@@ -50,7 +50,7 @@ module map_generation(
             // LFSR step: taps at 16,15,13,4 (x^16+x^15+x^13+x^4+1)
             lfsr <= {lfsr[14:0], lfsr[15] ^ lfsr[14] ^ lfsr[12] ^ lfsr[3]};
 
-            // Terrain height: base 32, variation Â±16 using top 5 bits
+            // Terrain height: base 32, variation ¡À16 using top 5 bits
             // Range: 20..52 within 0..63
             terrain[idx] <= 6'd28 + lfsr[15:11] - 5'd16;
 

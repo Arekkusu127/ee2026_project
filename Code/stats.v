@@ -19,39 +19,42 @@
 // 
 //////////////////////////////////////////////////////////////////////////////////
 
+`timescale 1ns / 1ps
+
 module stats(
     input  [3:0]  entity_id,
-    output reg [45:0] entity_data
+    output reg [45:0] entity_data,
+    output reg [8:0]  real_hp
 );
 
-    // Entity types
     localparam TYPE_PLAYER = 2'b00;
     localparam TYPE_MINION = 2'b01;
     localparam TYPE_BOSS   = 2'b10;
 
     always @(*) begin
         case (entity_id)
-            4'd0: // Player
-                // TYPE=00, HP=50(x4=200), DEF=5, ATK=25, MP=12, X=10, Y=0, hw=2, hh=1
-                entity_data = {TYPE_PLAYER, 6'd50, 6'd5, 6'd25, 6'd12, 7'd10, 6'd0, 4'd2, 3'd1};
-
-            4'd1: // Minion 0
-                // TYPE=01, HP=50, DEF=2, ATK=15, MP=0, X=55, Y=0, hw=1, hh=1
-                entity_data = {TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd55, 6'd0, 4'd1, 3'd1};
-
-            4'd2: // Minion 1
-                entity_data = {TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd70, 6'd0, 4'd1, 3'd1};
-
-            4'd3: // Minion 2
-                entity_data = {TYPE_MINION, 6'd50, 6'd2, 6'd15, 6'd0, 7'd85, 6'd0, 4'd1, 3'd1};
-
-            4'd4: // Boss
-                // TYPE=10, HP=50(x8=400), DEF=8, ATK=30, MP=0, X=80, Y=0, hw=3, hh=2
-                entity_data = {TYPE_BOSS, 6'd50, 6'd8, 6'd30, 6'd0, 7'd80, 6'd0, 4'd3, 3'd2};
-
-            default:
-                entity_data = {TYPE_MINION, 6'd30, 6'd2, 6'd10, 6'd0, 7'd50, 6'd0, 4'd1, 3'd1};
+            4'd0: begin // Player
+                entity_data = {TYPE_PLAYER, 6'd50, 6'd5, 6'd25, 6'd12, 7'd20, 6'd0, 4'd3, 3'd3};
+                real_hp = 9'd200;
+            end
+            4'd1: begin // Slime 0
+                entity_data = {TYPE_MINION, 6'd50, 6'd0, 6'd0, 6'd0, 7'd89, 6'd49, 4'd7, 3'd4};
+                real_hp = 9'd50;
+            end
+            4'd2: begin // Slime 1
+                entity_data = {TYPE_MINION, 6'd50, 6'd0, 6'd0, 6'd0, 7'd103, 6'd49, 4'd7, 3'd4};
+                real_hp = 9'd50;
+            end
+            4'd3: begin // Boss
+                entity_data = {TYPE_BOSS, 6'd63, 6'd30, 6'd40, 6'd0, 7'd75, 6'd32, 4'd5, 3'd4};
+                real_hp = 9'd400;
+            end
+            default: begin
+                entity_data = 46'd0;
+                real_hp = 9'd0;
+            end
         endcase
     end
 
 endmodule
+

@@ -1,18 +1,5 @@
 `timescale 1ns / 1ps
 
-/*
-Entity data format (46 bits):
-[45:44] TYPE
-[43:38] HP
-[37:32] DEF
-[31:26] ATK
-[25:20] MP
-[19:13] PosX
-[12:7]  PosY
-[6:3]   half_width
-[2:0]   half_height
-*/
-
 module game_state(
     input         clk,
     input         rst,
@@ -35,7 +22,6 @@ module game_state(
     output reg        trail_wr_en,
     output reg [6:0]  trail_wr_x,
     output reg [5:0]  trail_wr_y,
-    // Precalculated arc buffer outputs
     output reg        arc_clear,
     output reg        arc_wr_en,
     output reg [6:0]  arc_wr_x,
@@ -64,7 +50,7 @@ module game_state(
     output reg [6:0]  reticle_x,
     output reg [5:0]  reticle_y,
     output reg boss_attack_active,
-    output reg[6:0] boss_attack_x
+    output reg [6:0] boss_attack_x
 );
 
     localparam PH_INIT     = 3'd0;
@@ -80,7 +66,6 @@ module game_state(
     localparam TYPE_MINION = 2'b01;
     localparam TYPE_BOSS   = 2'b10;
 
-    // ---- Aim circle radius ----
     localparam [9:0] AIM_RADIUS_SQ = 10'd400;
 
     function [45:0] pack_entity;
@@ -127,9 +112,6 @@ module game_state(
 
     assign player_x = ent_px(player_entity);
     assign player_y = ent_py(player_entity);
-    wire [6:0] slime0_cx = slime0_x + 7'd7;  // slime width = 14
-    wire [6:0] slime1_cx = slime1_x + 7'd7;
-    wire [5:0] slime_cy  = slime_y  + 6'd4;  // slime height = 9    
 
     reg [8:0] real_hp_player;
     reg [8:0] real_hp_enemy [0:2];
@@ -141,24 +123,10 @@ module game_state(
     reg [5:0] enemy_attack_damage;
     reg boss_beam_hit_player;
 
-    // ---- Projectile physics (fixed point: 8 fractional bits) ----
+    // ---- Projectile physics ----
     reg signed [20:0] proj_fx, proj_fy;
     reg signed [15:0] proj_vx, proj_vy;
 
-    // Gravity tuned so that at power=15, angle=45, horizontal range = 96 pixels
-    // Physics: range = vx * 2 * vy / g (in pixel units)
-    // With sin/cos LUT scaled by 256:
-    //   vx_real = power * cos(45) / 256 * VELOCITY_SCALE
-    //   vy_real = power * sin(45) / 256 * VELOCITY_SCALE
-    // At 45 deg: sin=cos=181 (from LUT)
-    // vx = 15 * 181 * SCALE / 256, range = 2*vx*vy/g = 96
-    // We use: vx = power * cos_val (no extra shift), gravity chosen to match
-    // range = 2 * (P*C) * (P*S) / (G * 256) = 96 at P=15, C=S=181
-    // 2 * 15*181 * 15*181 / (G*256) = 96
-    // 2 * 2715 * 2715 / (G*256) = 96
-    // 14742450 / (G*256) = 96
-    // G = 14742450 / (96*256) = 14742450 / 24576 ≈ 600
-    // Per tick gravity increment = 600 (in fixed point with 8 frac bits)
     localparam signed [15:0] GRAVITY = 16'sd600;
 
     reg [2:0] trail_tick_cnt;
@@ -188,6 +156,7 @@ module game_state(
     reg [5:0]  skill_damage;
     reg [3:0]  skill_blast;
     reg [3:0]  skill_energy_cost;
+    reg [1:0]  skill_type;  // 0=basic, 1=spread, 2=explosive_radius, 3=explosive_damage
 
     reg [9:0]  anim_ticks;
     reg [5:0]  ai_delay;
@@ -203,8 +172,20 @@ module game_state(
     reg [6:0]  move_target_x;
     reg [1:0]  fire_step;
 
+    // ---- Multi-projectile support (for spread shot) ----
+    reg [1:0]  spread_idx;       // which spread projectile (0,1,2)
+    reg [1:0]  spread_count;     // total projectiles to fire (1 or 3)
+    reg        spread_pending;   // more projectiles to fire after current one resolves
+    // Accumulated damage across spread projectiles
+    reg [8:0]  spread_dmg_enemy0;
+    reg [8:0]  spread_dmg_enemy1;
+    reg [8:0]  spread_dmg_boss;
+
+    // ---- Explosive radius for skill types 2,3 ----
+    reg [3:0]  effective_blast;
+
     // ---- Precalculated arc state ----
-    reg [1:0]  arc_calc_state;  // 0=idle, 1=calculating, 2=done
+    reg [1:0]  arc_calc_state;
     reg [6:0]  arc_step;
     reg signed [20:0] arc_fx, arc_fy;
     reg signed [15:0] arc_vx, arc_vy;
@@ -244,7 +225,6 @@ module game_state(
     wire allow_left  = (dsq_left  <= {6'd0, AIM_RADIUS_SQ});
     wire allow_right = (dsq_right <= {6'd0, AIM_RADIUS_SQ});
 
-    // ---- Current reticle delta from player ----
     wire signed [7:0] ret_dx = $signed({1'b0, reticle_x}) - $signed({1'b0, pcx});
     wire signed [7:0] ret_dy = $signed({2'b0, reticle_y}) - $signed({2'b0, pcy});
 
@@ -253,7 +233,6 @@ module game_state(
 
     wire [15:0] ret_dsq = ret_dx * ret_dx + ret_dy * ret_dy;
 
-    // Power mapped from distance (0..400 → 1..15)
     wire [3:0] computed_power = (ret_dsq >= 16'd348) ? 4'd15 :
                                 (ret_dsq >= 16'd300) ? 4'd14 :
                                 (ret_dsq >= 16'd256) ? 4'd13 :
@@ -269,7 +248,6 @@ module game_state(
                                 (ret_dsq >= 16'd7)   ? 4'd3  :
                                 (ret_dsq >= 16'd2)   ? 4'd2  : 4'd1;
 
-    // ---- Angle from reticle position ----
     wire [12:0] dy_64     = {7'b0, abs_dy} << 6;
     wire [12:0] dx_tan10  = {6'b0, abs_dx} * 7'd11;
     wire [12:0] dx_tan20  = {6'b0, abs_dx} * 7'd23;
@@ -293,30 +271,38 @@ module game_state(
                                     (dy_64 >= dx_tan10)           ? 7'd15 :
                                                                     7'd5;
 
-    wire reticle_above = ret_dy[7]; // negative dy means above
+    wire reticle_above = ret_dy[7];
     wire reticle_right = !ret_dx[7];
     wire [6:0] launch_elevation = reticle_above ? computed_angle_raw : 7'd0;
 
-    // ---- Skill decoder (integrated from projectile.v) ----
+    // ---- Skill decoder with skill types ----
+    // Type 0: basic (energy 0-4), single projectile
+    // Type 1: spread (energy 5-8), three projectiles
+    // Type 2: explosive radius (energy 9-12), single with big blast
+    // Type 3: explosive damage (energy 13-15), single with big damage
     always @(*) begin
         case (skill_sel)
-            4'd0:  begin skill_damage = 6'd15; skill_blast = 4'd2; skill_energy_cost = 4'd0;  end
-            4'd1:  begin skill_damage = 6'd18; skill_blast = 4'd2; skill_energy_cost = 4'd1;  end
-            4'd2:  begin skill_damage = 6'd22; skill_blast = 4'd3; skill_energy_cost = 4'd2;  end
-            4'd3:  begin skill_damage = 6'd25; skill_blast = 4'd3; skill_energy_cost = 4'd3;  end
-            4'd4:  begin skill_damage = 6'd28; skill_blast = 4'd3; skill_energy_cost = 4'd4;  end
-            4'd5:  begin skill_damage = 6'd30; skill_blast = 4'd4; skill_energy_cost = 4'd5;  end
-            4'd6:  begin skill_damage = 6'd33; skill_blast = 4'd4; skill_energy_cost = 4'd6;  end
-            4'd7:  begin skill_damage = 6'd36; skill_blast = 4'd4; skill_energy_cost = 4'd7;  end
-            4'd8:  begin skill_damage = 6'd39; skill_blast = 4'd5; skill_energy_cost = 4'd8;  end
-            4'd9:  begin skill_damage = 6'd42; skill_blast = 4'd5; skill_energy_cost = 4'd9;  end
-            4'd10: begin skill_damage = 6'd45; skill_blast = 4'd5; skill_energy_cost = 4'd10; end
-            4'd11: begin skill_damage = 6'd48; skill_blast = 4'd6; skill_energy_cost = 4'd11; end
-            4'd12: begin skill_damage = 6'd51; skill_blast = 4'd6; skill_energy_cost = 4'd12; end
-            4'd13: begin skill_damage = 6'd54; skill_blast = 4'd7; skill_energy_cost = 4'd13; end
-            4'd14: begin skill_damage = 6'd57; skill_blast = 4'd7; skill_energy_cost = 4'd14; end
-            4'd15: begin skill_damage = 6'd63; skill_blast = 4'd8; skill_energy_cost = 4'd15; end
-            default: begin skill_damage = 6'd15; skill_blast = 4'd2; skill_energy_cost = 4'd0; end
+            // Basic projectiles (0-4): increasing damage, small blast
+            4'd0:  begin skill_damage = 6'd10; skill_blast = 4'd2; skill_energy_cost = 4'd0;  skill_type = 2'd0; end
+            4'd1:  begin skill_damage = 6'd13; skill_blast = 4'd2; skill_energy_cost = 4'd1;  skill_type = 2'd0; end
+            4'd2:  begin skill_damage = 6'd16; skill_blast = 4'd2; skill_energy_cost = 4'd2;  skill_type = 2'd0; end
+            4'd3:  begin skill_damage = 6'd19; skill_blast = 4'd3; skill_energy_cost = 4'd3;  skill_type = 2'd0; end
+            4'd4:  begin skill_damage = 6'd22; skill_blast = 4'd3; skill_energy_cost = 4'd4;  skill_type = 2'd0; end
+            // Spread projectiles (5-8): three shots, increasing damage
+            4'd5:  begin skill_damage = 6'd12; skill_blast = 4'd2; skill_energy_cost = 4'd5;  skill_type = 2'd1; end
+            4'd6:  begin skill_damage = 6'd15; skill_blast = 4'd2; skill_energy_cost = 4'd6;  skill_type = 2'd1; end
+            4'd7:  begin skill_damage = 6'd18; skill_blast = 4'd3; skill_energy_cost = 4'd7;  skill_type = 2'd1; end
+            4'd8:  begin skill_damage = 6'd21; skill_blast = 4'd3; skill_energy_cost = 4'd8;  skill_type = 2'd1; end
+            // Explosive radius (9-12): single shot, increasing blast radius
+            4'd9:  begin skill_damage = 6'd20; skill_blast = 4'd5; skill_energy_cost = 4'd9;  skill_type = 2'd2; end
+            4'd10: begin skill_damage = 6'd22; skill_blast = 4'd6; skill_energy_cost = 4'd10; skill_type = 2'd2; end
+            4'd11: begin skill_damage = 6'd24; skill_blast = 4'd7; skill_energy_cost = 4'd11; skill_type = 2'd2; end
+            4'd12: begin skill_damage = 6'd26; skill_blast = 4'd8; skill_energy_cost = 4'd12; skill_type = 2'd2; end
+            // Explosive damage (13-15): single shot, big damage
+            4'd13: begin skill_damage = 6'd40; skill_blast = 4'd4; skill_energy_cost = 4'd13; skill_type = 2'd3; end
+            4'd14: begin skill_damage = 6'd50; skill_blast = 4'd4; skill_energy_cost = 4'd14; skill_type = 2'd3; end
+            4'd15: begin skill_damage = 6'd63; skill_blast = 4'd5; skill_energy_cost = 4'd15; skill_type = 2'd3; end
+            default: begin skill_damage = 6'd10; skill_blast = 4'd2; skill_energy_cost = 4'd0; skill_type = 2'd0; end
         endcase
     end
 
@@ -334,9 +320,6 @@ module game_state(
         end
     endfunction
 
-    // ---- Terrain generation (integrated from map_generation.v) ----
-    // Flat terrain at row 50 for all columns (visual terrain removed,
-    // but we still use the RAM for entity ground placement)
     reg [5:0] computed_terrain;
     always @(*) begin
         computed_terrain = 6'd50;
@@ -346,17 +329,35 @@ module game_state(
         player_hp = real_hp_player;
     end
 
+    // ---- Boss sprite collision constants (matching render module) ----
+    localparam [6:0] BOSS_SPRITE_LEFT  = 7'd55;
+    localparam [5:0] BOSS_SPRITE_TOP   = 6'd7;
+    localparam [6:0] BOSS_SPRITE_W     = 7'd40;
+    localparam [5:0] BOSS_SPRITE_H     = 6'd50;
+
+    // ---- Spread angle offsets (in degrees from base angle) ----
+    // Spread fires at base angle, base+10, base-10
+    reg signed [7:0] spread_angle_offset;
+    always @(*) begin
+        case (spread_idx)
+            2'd0: spread_angle_offset = 8'sd0;    // center
+            2'd1: spread_angle_offset = 8'sd10;   // up
+            2'd2: spread_angle_offset = -8'sd10;  // down
+            default: spread_angle_offset = 8'sd0;
+        endcase
+    end
+
     // ====== MAIN FSM ======
     always @(posedge clk or posedge rst) begin
         if (rst) begin
             boss_beam_hit_player <= 0;
             boss_attack_active <= 0;
-            boss_attack_x     <=0;
+            boss_attack_x     <= 0;
             game_phase        <= PH_INIT;
             real_hp_player    <= 9'd200;
             player_angle      <= 7'd45;
             player_power      <= 4'd8;
-            player_energy     <= 4'd12;
+            player_energy     <= 4'd4;   // Start with 4 energy
             player_fuel       <= 4'd10;
             current_round     <= 0;
             enemy_alive       <= 3'b011;
@@ -395,7 +396,6 @@ module game_state(
             fire_step         <= 0;
             reticle_x         <= 7'd30;
             reticle_y         <= 6'd20;
-
             arc_clear         <= 0;
             arc_wr_en         <= 0;
             arc_wr_x          <= 0;
@@ -409,12 +409,17 @@ module game_state(
             arc_needs_update  <= 0;
             last_reticle_x    <= 7'd0;
             last_reticle_y    <= 6'd0;
+            spread_idx        <= 0;
+            spread_count      <= 1;
+            spread_pending    <= 0;
+            spread_dmg_enemy0 <= 0;
+            spread_dmg_enemy1 <= 0;
+            spread_dmg_boss   <= 0;
+            effective_blast   <= 0;
             player_entity     <= pack_entity(TYPE_PLAYER, 6'd50, 6'd5, 6'd25, 6'd12, 7'd20, 6'd0, 4'd3, 3'd3);
-            // Stats integrated from stats.v
             enemy_entity_0 <= pack_entity(TYPE_MINION, 6'd50, 6'd0, 6'd0, 6'd0, 7'd89, 6'd49, 4'd7, 3'd4);
             enemy_entity_1 <= pack_entity(TYPE_MINION, 6'd50, 6'd0, 6'd0, 6'd0, 7'd103, 6'd49, 4'd7, 3'd4);
             enemy_entity_2 <= 46'd0;
-
             real_hp_enemy[0] <= 9'd50;
             real_hp_enemy[1] <= 9'd50;
             real_hp_enemy[2] <= 9'd0;
@@ -428,7 +433,7 @@ module game_state(
             if (hit_event && tick_30hz)
                 hit_event <= 0;
 
-            // ---- Precalculated arc computation (runs in background during AIM phase) ----
+            // ---- Precalculated arc computation ----
             if (game_phase == PH_AIM && is_player_turn) begin
                 if (reticle_x != last_reticle_x || reticle_y != last_reticle_y) begin
                     arc_needs_update <= 1;
@@ -437,16 +442,14 @@ module game_state(
                 end
 
                 case (arc_calc_state)
-                2'd0: begin // idle - check if update needed
+                2'd0: begin
                     if (arc_needs_update) begin
                         arc_clear      <= 1;
                         arc_calc_state <= 2'd1;
                         arc_step       <= 0;
                         arc_needs_update <= 0;
-                        // Initialize arc trajectory from player position
                         arc_fx <= {ent_px(player_entity), 8'd128};
                         arc_fy <= {ent_py(player_entity), 8'd0};
-                        // Compute velocity based on current reticle
                         if (reticle_right)
                             arc_vx <= $signed({1'b0, computed_power}) * $signed({1'b0, cos_val});
                         else
@@ -457,25 +460,20 @@ module game_state(
                             arc_vy <= $signed({1'b0, computed_power}) * $signed({1'b0, sin_val});
                     end
                 end
-                2'd1: begin // calculating - step through arc
+                2'd1: begin
                     if (arc_step < 7'd120) begin
                         arc_fx <= arc_fx + {{5{arc_vx[15]}}, arc_vx};
                         arc_fy <= arc_fy + {{5{arc_vy[15]}}, arc_vy};
                         arc_vy <= arc_vy + GRAVITY;
                         arc_step <= arc_step + 1;
-
-                        // Write pixel if in bounds
                         if (!arc_fx[20] && arc_fx[14:8] < 7'd96 &&
                             !arc_fy[20] && arc_fy[13:8] < 7'd64) begin
-                            // Write every other step for dotted look
                             if (arc_step[1:0] == 2'b00) begin
                                 arc_wr_en <= 1;
                                 arc_wr_x  <= arc_fx[14:8];
                                 arc_wr_y  <= arc_fy[13:8];
                             end
                         end
-
-                        // Stop if out of bounds
                         if (arc_fx[20] || arc_fx[14:8] >= 7'd96 ||
                             arc_fy[20] || arc_fy[13:8] >= 6'd63) begin
                             arc_calc_state <= 2'd2;
@@ -484,14 +482,13 @@ module game_state(
                         arc_calc_state <= 2'd2;
                     end
                 end
-                2'd2: begin // done
+                2'd2: begin
                     if (arc_needs_update)
                         arc_calc_state <= 2'd0;
                 end
                 default: arc_calc_state <= 2'd0;
                 endcase
             end else begin
-                // Not in AIM phase - reset arc state
                 if (game_phase != PH_AIM) begin
                     arc_calc_state <= 2'd0;
                     arc_needs_update <= 0;
@@ -526,17 +523,26 @@ module game_state(
                     player_entity <= set_pos(player_entity,
                         ent_px(player_entity),
                         (terrain_rd_data_a >= 6'd6) ? terrain_rd_data_a - 6'd5 : 6'd1);
-
-                    if (current_round) begin
-                        terrain_rd_addr_a <= ent_px(enemy_entity_0);
-                        init_step <= 3'd4;
-                    end else begin
-                        init_step <= 3'd7;
-                    end
+                    terrain_rd_addr_a <= ent_px(enemy_entity_0);
+                    init_step <= 3'd4;
                 end
                 3'd4: begin
                     enemy_entity_0 <= set_pos(enemy_entity_0,
                         ent_px(enemy_entity_0),
+                        (terrain_rd_data_a >= 6'd7) ? terrain_rd_data_a - 6'd6 : 6'd1);
+                    terrain_rd_addr_a <= ent_px(enemy_entity_1);
+                    init_step <= 3'd5;
+                end
+                3'd5: begin
+                    enemy_entity_1 <= set_pos(enemy_entity_1,
+                        ent_px(enemy_entity_1),
+                        (terrain_rd_data_a >= 6'd7) ? terrain_rd_data_a - 6'd6 : 6'd1);
+                    terrain_rd_addr_a <= ent_px(enemy_entity_2);
+                    init_step <= 3'd6;
+                end
+                3'd6: begin
+                    enemy_entity_2 <= set_pos(enemy_entity_2,
+                        ent_px(enemy_entity_2),
                         (terrain_rd_data_a >= 6'd7) ? terrain_rd_data_a - 6'd6 : 6'd1);
                     init_step <= 3'd7;
                 end
@@ -561,7 +567,6 @@ module game_state(
                         if (confirm_aim || player_fuel == 4'd0) begin
                             game_phase <= PH_AIM;
                             move_step  <= 0;
-                            // Initialize reticle above and to the right of player
                             if (ent_px(player_entity) + 7'd14 <= 7'd95)
                                 reticle_x <= ent_px(player_entity) + 7'd14;
                             else
@@ -570,12 +575,10 @@ module game_state(
                                 reticle_y <= ent_py(player_entity) - 6'd14;
                             else
                                 reticle_y <= 6'd0;
-                            // Force arc recalculation
                             arc_needs_update <= 1;
-                            last_reticle_x   <= 7'h7F; // invalid to force mismatch
+                            last_reticle_x   <= 7'h7F;
                             last_reticle_y   <= 6'h3F;
                             arc_calc_state   <= 2'd0;
-                            // Set LUT angle for arc calculation
                             lut_angle <= launch_elevation;
                         end else if (move_left && player_fuel > 0) begin
                             if (ent_px(player_entity) > 7'd1) begin
@@ -611,27 +614,19 @@ module game_state(
             // ===== AIM =====
             PH_AIM: begin
                 if (is_player_turn) begin
-                    // btnU moves reticle up
                     if (angle_up && allow_up)
                         reticle_y <= cand_y_up;
-                    // btnD moves reticle down
                     if (angle_down && allow_down)
                         reticle_y <= cand_y_down;
-                    // btnL moves reticle left
                     if (move_left && allow_left)
                         reticle_x <= cand_x_left;
-                    // btnR moves reticle right
                     if (move_right && allow_right)
                         reticle_x <= cand_x_right;
 
-                    // Update LUT angle for arc preview
                     lut_angle <= launch_elevation;
-
-                    // Update displayed angle and power from reticle position
                     player_angle <= launch_elevation;
                     player_power <= computed_power;
 
-                    // btnC confirms aim and fires
                     if (fire_btn) begin
                         if (player_energy >= skill_energy_cost) begin
                             player_energy  <= player_energy - skill_energy_cost;
@@ -641,7 +636,20 @@ module game_state(
                             lut_ready      <= 0;
                             fire_step      <= 0;
                             trail_clear    <= 1;
-                            arc_clear      <= 1;  // Clear arc preview on fire
+                            arc_clear      <= 1;
+                            // Set up spread count
+                            if (skill_type == 2'd1) begin
+                                spread_count <= 2'd3;
+                            end else begin
+                                spread_count <= 2'd1;
+                            end
+                            spread_idx        <= 0;
+                            spread_pending    <= 0;
+                            spread_dmg_enemy0 <= 0;
+                            spread_dmg_enemy1 <= 0;
+                            spread_dmg_boss   <= 0;
+                            // Set effective blast radius
+                            effective_blast <= skill_blast;
                         end
                     end
                 end else begin
@@ -652,6 +660,12 @@ module game_state(
                             ai_delay   <= 0;
                             game_phase <= PH_FIRE;
                             fire_step  <= 0;
+                            spread_count <= 2'd1;
+                            spread_idx   <= 0;
+                            spread_pending <= 0;
+                            spread_dmg_enemy0 <= 0;
+                            spread_dmg_enemy1 <= 0;
+                            spread_dmg_boss   <= 0;
                         end
                     end else begin
                         if (ai_delay < 6'd30) begin
@@ -665,6 +679,12 @@ module game_state(
                             lut_ready      <= 0;
                             fire_step      <= 0;
                             trail_clear    <= 1;
+                            spread_count   <= 2'd1;
+                            spread_idx     <= 0;
+                            spread_pending <= 0;
+                            spread_dmg_enemy0 <= 0;
+                            spread_dmg_enemy1 <= 0;
+                            spread_dmg_boss   <= 0;
                         end
                     end
                 end
@@ -676,6 +696,14 @@ module game_state(
                 2'd0: begin
                     if (!is_player_turn && !current_round) begin
                         lut_angle <= (ai_angle > 7'd55) ? 7'd55 : ai_angle;
+                    end else if (is_player_turn && skill_type == 2'd1 && spread_idx != 2'd0) begin
+                        // For spread shots 1 and 2, adjust lut_angle
+                        // spread_idx 1: angle + 10, spread_idx 2: angle - 10
+                        if (spread_idx == 2'd1) begin
+                            lut_angle <= (launch_elevation + 7'd10 > 7'd90) ? 7'd90 : launch_elevation + 7'd10;
+                        end else begin
+                            lut_angle <= (launch_elevation >= 7'd10) ? launch_elevation - 7'd10 : 7'd0;
+                        end
                     end
                     fire_step <= 2'd1;
                 end
@@ -691,7 +719,6 @@ module game_state(
                         game_phase         <= PH_ANIMATE;
                         fire_step          <= 0;
                     end else begin
-                        // keep your existing projectile launch code here
                         proj_active    <= 1;
                         anim_ticks     <= 0;
                         trail_tick_cnt <= 0;
@@ -741,11 +768,11 @@ module game_state(
                         fire_step  <= 0;
                     end
                 end
+                default: fire_step <= 2'd0;
                 endcase
             end
 
             // ===== ANIMATE =====
-            // No terrain collision - projectile flies until hitting entity or going OOB
             PH_ANIMATE: begin
                 if (!is_player_turn && current_round && boss_attack_active) begin
                     if (tick_30hz) begin
@@ -754,7 +781,6 @@ module game_state(
                             (boss_attack_x + 7'd1 >= ent_px(player_entity) - {3'd0, ent_hw(player_entity)})) begin
                             boss_beam_hit_player <= 1'b1;
                         end
-
                         if (boss_attack_x >= 7'd95) begin
                             boss_attack_active <= 0;
                             game_phase         <= PH_RESOLVE;
@@ -763,7 +789,7 @@ module game_state(
                             boss_attack_x <= boss_attack_x + 7'd2;
                         end
                     end
-                end else begin
+                end else if (tick_30hz) begin
                     proj_fx <= proj_fx + {{5{proj_vx[15]}}, proj_vx};
                     proj_fy <= proj_fy + {{5{proj_vy[15]}}, proj_vy};
                     proj_vy <= proj_vy + GRAVITY;
@@ -774,17 +800,14 @@ module game_state(
                     if (!proj_fy[20] && proj_fy[13:8] < 7'd64)
                         proj_y <= proj_fy[13:8];
 
-                    trail_tick_cnt <= trail_tick_cnt + 1;
-                    if (trail_tick_cnt[0] == 1'b0) begin
-                        if (!proj_fx[20] && proj_fx[14:8] < 7'd96 &&
-                            !proj_fy[20] && proj_fy[13:8] < 7'd64) begin
-                            trail_wr_en <= 1;
-                            trail_wr_x  <= proj_fx[14:8];
-                            trail_wr_y  <= proj_fy[13:8];
-                        end
+                    if (!proj_fx[20] && proj_fx[14:8] < 7'd96 &&
+                        !proj_fy[20] && proj_fy[13:8] < 7'd64) begin
+                        trail_wr_en <= 1;
+                        trail_wr_x  <= proj_fx[14:8];
+                        trail_wr_y  <= proj_fy[13:8];
                     end
 
-                    // Check OOB (no terrain collision)
+                    // Check OOB
                     if (proj_fx[20] || proj_fx[14:8] >= 7'd96 ||
                         proj_fy[20] || (!proj_fy[20] && proj_fy[13:8] >= 6'd63) ||
                         anim_ticks > 10'd300) begin
@@ -793,25 +816,31 @@ module game_state(
                         resolve_step <= 0;
                     end
 
-                    // Check entity hit during animation for player shots
+                    // Check entity hit for player shots
                     if (is_player_turn && !proj_fx[20] && !proj_fy[20]) begin
                         if (!current_round) begin
+                            // Round 1: hit slimes using sprite bounding box
                             if (enemy_alive[0] &&
-                                manhattan(proj_fx[14:8], proj_fy[13:8], slime0_cx, slime_cy) <= {4'd0, skill_blast}) begin
+                                proj_fx[14:8] >= slime0_x && proj_fx[14:8] <= slime0_x + 7'd13 &&
+                                proj_fy[13:8] >= slime_y  && proj_fy[13:8] <= slime_y  + 6'd8) begin
                                 proj_active  <= 0;
                                 game_phase   <= PH_RESOLVE;
                                 resolve_step <= 0;
                             end
                             if (enemy_alive[1] &&
-                                manhattan(proj_fx[14:8], proj_fy[13:8], slime1_cx, slime_cy) <= {4'd0, skill_blast}) begin
+                                proj_fx[14:8] >= slime1_x && proj_fx[14:8] <= slime1_x + 7'd13 &&
+                                proj_fy[13:8] >= slime_y  && proj_fy[13:8] <= slime_y  + 6'd8) begin
                                 proj_active  <= 0;
                                 game_phase   <= PH_RESOLVE;
                                 resolve_step <= 0;
                             end
                         end else begin
+                            // Round 2: hit boss using SPRITE bounding box (not entity coords)
                             if (enemy_alive[0] &&
-                                manhattan(proj_fx[14:8], proj_fy[13:8],
-                                    ent_px(enemy_entity_0), ent_py(enemy_entity_0)) <= {4'd0, skill_blast}) begin
+                                proj_fx[14:8] >= BOSS_SPRITE_LEFT &&
+                                proj_fx[14:8] < BOSS_SPRITE_LEFT + BOSS_SPRITE_W &&
+                                proj_fy[13:8] >= BOSS_SPRITE_TOP &&
+                                proj_fy[13:8] < BOSS_SPRITE_TOP + BOSS_SPRITE_H) begin
                                 proj_active  <= 0;
                                 game_phase   <= PH_RESOLVE;
                                 resolve_step <= 0;
@@ -833,6 +862,7 @@ module game_state(
 
             // ===== RESOLVE =====
             PH_RESOLVE: begin
+                trail_clear <= 1;
                 case (resolve_step)
                 3'd0: begin
                     next_player_hp   = real_hp_player;
@@ -845,7 +875,8 @@ module game_state(
                         if (!current_round) begin
                             // Player attacks slime 0
                             if (enemy_alive[0] &&
-                                manhattan(proj_x, proj_y, slime0_cx, slime_cy) <= {4'd0, skill_blast}) begin
+                                proj_x >= slime0_x && proj_x <= slime0_x + 7'd13 &&
+                                proj_y >= slime_y  && proj_y <= slime_y  + 6'd8) begin
                                 if (next_enemy_hp0 <= {3'd0, skill_damage}) begin
                                     hit_event           <= 1'b1;
                                     hit_damage          <= next_enemy_hp0[7:0];
@@ -857,10 +888,10 @@ module game_state(
                                     next_enemy_hp0 = next_enemy_hp0 - {3'd0, skill_damage};
                                 end
                             end
-
                             // Player attacks slime 1
                             if (enemy_alive[1] &&
-                                manhattan(proj_x, proj_y, slime1_cx, slime_cy) <= {4'd0, skill_blast}) begin
+                                proj_x >= slime1_x && proj_x <= slime1_x + 7'd13 &&
+                                proj_y >= slime_y  && proj_y <= slime_y  + 6'd8) begin
                                 if (next_enemy_hp1 <= {3'd0, skill_damage}) begin
                                     hit_event           <= 1'b1;
                                     hit_damage          <= next_enemy_hp1[7:0];
@@ -873,10 +904,12 @@ module game_state(
                                 end
                             end
                         end else begin
-                            // Player attacks boss
+                            // Player attacks boss - USE SPRITE BOUNDING BOX
                             if (enemy_alive[0] &&
-                                manhattan(proj_x, proj_y,
-                                    ent_px(enemy_entity_0), ent_py(enemy_entity_0)) <= {4'd0, skill_blast}) begin
+                                proj_x >= BOSS_SPRITE_LEFT &&
+                                proj_x < BOSS_SPRITE_LEFT + BOSS_SPRITE_W &&
+                                proj_y >= BOSS_SPRITE_TOP &&
+                                proj_y < BOSS_SPRITE_TOP + BOSS_SPRITE_H) begin
                                 if (next_enemy_hp0 <= {3'd0, skill_damage}) begin
                                     hit_event           <= 1'b1;
                                     hit_damage          <= next_enemy_hp0[7:0];
@@ -905,6 +938,17 @@ module game_state(
                         end
                     end
 
+                    // Accumulate spread damage
+                    if (is_player_turn && skill_type == 2'd1) begin
+                        // Store current projectile's damage contribution
+                        if (!current_round) begin
+                            spread_dmg_enemy0 <= spread_dmg_enemy0 + (real_hp_enemy[0] - next_enemy_hp0);
+                            spread_dmg_enemy1 <= spread_dmg_enemy1 + (real_hp_enemy[1] - next_enemy_hp1);
+                        end else begin
+                            spread_dmg_boss <= spread_dmg_boss + (real_hp_enemy[0] - next_enemy_hp0);
+                        end
+                    end
+
                     real_hp_player    <= next_player_hp;
                     real_hp_enemy[0]  <= next_enemy_hp0;
                     real_hp_enemy[1]  <= next_enemy_hp1;
@@ -919,45 +963,61 @@ module game_state(
                         (next_enemy_hp1 > 9'd63) ? 6'd63 : next_enemy_hp1[5:0]);
                     enemy_entity_2 <= 46'd0;
 
-                    if (next_player_hp == 9'd0) begin
-                        defeat     <= 1'b1;
-                        game_phase <= PH_GAMEOVER;
-                    end
-                    else if (next_enemy_alive == 3'b000) begin
-                        if (!current_round) begin
-                            current_round     <= 1'b1;
-                            player_energy     <= 4'd12;
-                            is_player_turn    <= 1'b1;
-                            current_enemy_idx <= 2'd0;
-                            player_fuel       <= 4'd10;
-
-                            enemy_entity_0    <= pack_entity(TYPE_BOSS, 6'd63, 6'd30, 6'd40, 6'd0,
-                                                             7'd75, 6'd32, 4'd5, 3'd4);
-                            enemy_entity_1    <= 46'd0;
-                            enemy_entity_2    <= 46'd0;
-                            real_hp_enemy[0]  <= 9'd400;
-                            real_hp_enemy[1]  <= 9'd0;
-                            real_hp_enemy[2]  <= 9'd0;
-                            enemy_alive       <= 3'b001;
-
-                            game_phase        <= PH_MOVE;
-                        end else begin
-                            victory    <= 1'b1;
+                    // Check if more spread projectiles to fire
+                    if (is_player_turn && skill_type == 2'd1 && spread_idx + 2'd1 < spread_count) begin
+                        // More spread shots remaining
+                        spread_idx   <= spread_idx + 2'd1;
+                        // Go back to FIRE phase for next spread projectile
+                        game_phase   <= PH_FIRE;
+                        fire_step    <= 0;
+                        lut_ready    <= 0;
+                        trail_clear  <= 1;
+                        resolve_step <= 0;
+                    end else begin
+                        // All projectiles resolved - check win/loss
+                        if (next_player_hp == 9'd0) begin
+                            defeat     <= 1'b1;
                             game_phase <= PH_GAMEOVER;
                         end
-                    end
-                    else begin
-                        if (!current_round) begin
-                            // Round 1: slimes do not attack, go straight back to player move
-                            is_player_turn <= 1'b1;
-                            player_fuel    <= 4'd10;
-                            game_phase     <= PH_MOVE;
-                        end else begin
-                            game_phase <= PH_NEXTTURN;
-                        end
-                    end
+                        else if (next_enemy_alive == 3'b000) begin
+                            if (!current_round) begin
+                                current_round     <= 1'b1;
+                                // Energy carries over, no reset here
+                                is_player_turn    <= 1'b1;
+                                current_enemy_idx <= 2'd0;
+                                player_fuel       <= 4'd10;
 
-                    resolve_step <= 0;
+                                enemy_entity_0    <= pack_entity(TYPE_BOSS, 6'd63, 6'd30, 6'd40, 6'd0,
+                                                                 7'd75, 6'd32, 4'd5, 3'd4);
+                                enemy_entity_1    <= 46'd0;
+                                enemy_entity_2    <= 46'd0;
+                                real_hp_enemy[0]  <= 9'd400;
+                                real_hp_enemy[1]  <= 9'd0;
+                                real_hp_enemy[2]  <= 9'd0;
+                                enemy_alive       <= 3'b001;
+
+                                game_phase        <= PH_MOVE;
+                            end else begin
+                                victory    <= 1'b1;
+                                game_phase <= PH_GAMEOVER;
+                            end
+                        end
+                        else begin
+                            if (!current_round) begin
+                                is_player_turn <= 1'b1;
+                                player_fuel    <= 4'd10;
+                                // Energy regen +2 per turn (capped at 15)
+                                if (player_energy + 4'd2 > 4'd15)
+                                    player_energy <= 4'd15;
+                                else
+                                    player_energy <= player_energy + 4'd2;
+                                game_phase     <= PH_MOVE;
+                            end else begin
+                                game_phase <= PH_NEXTTURN;
+                            end
+                        end
+                        resolve_step <= 0;
+                    end
                 end
                 default: resolve_step <= 3'd0;
                 endcase
@@ -968,6 +1028,11 @@ module game_state(
                 if (!current_round) begin
                     is_player_turn <= 1'b1;
                     player_fuel    <= 4'd10;
+                    // Energy regen +2
+                    if (player_energy + 4'd2 > 4'd15)
+                        player_energy <= 4'd15;
+                    else
+                        player_energy <= player_energy + 4'd2;
                     game_phase     <= PH_MOVE;
                 end else begin
                     if (is_player_turn) begin
@@ -977,10 +1042,16 @@ module game_state(
                     end else begin
                         is_player_turn <= 1'b1;
                         player_fuel    <= 4'd10;
+                        // Energy regen +2
+                        if (player_energy + 4'd2 > 4'd15)
+                            player_energy <= 4'd15;
+                        else
+                            player_energy <= player_energy + 4'd2;
                         game_phase     <= PH_MOVE;
                     end
                 end
             end
+
             // ===== GAMEOVER =====
             PH_GAMEOVER: begin
                 // Stay

@@ -1,136 +1,23 @@
 `timescale 1ns / 1ps
-module slime0(
-    input frame_begin,
-    input [3:0] x_pos,
-    input [3:0] y_pos,
-    output [15:0] pixel,
-    output visible
-);
-    reg [15:0] rom [0:125];
-    initial begin
-        `ifdef SYNTHESIS
-            $readmemb("../../FDP.srcs/sources_1/new/slime0.bin", rom);
-        `else
-            $readmemb("../../../../FDP.srcs/sources_1/new/slime0.bin", rom);
-        `endif
-    end
-
-    wire [6:0] addr = y_pos * 14 + {3'd0, x_pos};
-    assign pixel = rom[addr];
-    assign visible = (pixel != 16'hffff);
-endmodule
-
-module slime1(
-    input frame_begin,
-    input [3:0] x_pos,
-    input [3:0] y_pos,
-    output [15:0] pixel,
-    output visible
-);
-    reg [15:0] rom [0:125];
-    initial begin
-        `ifdef SYNTHESIS
-            $readmemb("../../FDP.srcs/sources_1/new/slime1.bin", rom);
-        `else
-            $readmemb("../../../../FDP.srcs/sources_1/new/slime1.bin", rom);
-        `endif
-    end
-
-    wire [6:0] addr = y_pos * 14 + {3'd0, x_pos};
-    assign pixel = rom[addr];
-    assign visible = (pixel != 16'hffff);
-endmodule
-
-module boss(
-    input frame_begin,
-    input [5:0] x_pos,
-    input [5:0] y_pos,
-    output  [15:0] pixel,
-    output visible
-);
-    reg [15:0] rom [0:1999];
-    initial begin
-        `ifdef SYNTHESIS
-            $readmemb("../../FDP.srcs/sources_1/new/boss.bin", rom);
-        `else
-            $readmemb("../../../../FDP.srcs/sources_1/new/boss.bin", rom);
-        `endif
-    end
-    wire [10:0] addr = y_pos * 40 + x_pos; // 40 pixels per row
-    assign pixel = rom[addr];
-    wire [4:0] r = pixel[15:11];
-    wire [5:0] g = pixel[10:5];
-    wire [4:0] b = pixel[4:0];
-    assign visible = !( (r >= 28) && (g >= 45) && (g <= 55) && (b >= 28) );
-
-endmodule
-
-module girl(
-    input game_started,
-    input [4:0] x_pos,
-    input [4:0] y_pos,
-    output  [15:0] pixel,
-    output visible
-);
-    reg [15:0] rom [0:899];  // 900 pixels, each 16 bits
-    initial begin
-    `ifdef SYNTHESIS
-        $readmemb("../../FDP.srcs/sources_1/new/girl.bin", rom);
-    `else
-        $readmemb("../../../../FDP.srcs/sources_1/new/girl.bin", rom);
-    `endif
-    end
-    wire [9:0] addr = y_pos * 30 + x_pos; // 30 pixels per row
-    assign pixel = rom[addr];
-    wire [4:0] r = pixel[15:11];
-    wire [5:0] g = pixel[10:5];
-    wire [4:0] b = pixel[4:0];
-    assign visible = !( (r >= 28) && (g >= 45) && (g <= 55) && (b >= 28) );
-endmodule
-
-module background(
-    input CLOCK,
-    input game_started,
-    input frame_begin,
-    input  [6:0] hcount,
-    input  [5:0] vcount,
-    output [15:0] pixel
-);
-    reg [15:0] rom0 [0:6143];
-    reg [15:0] rom1 [0:6143];
-    reg [15:0] rom2 [0:6143];
-
-    initial begin
-    `ifdef SYNTHESIS
-        $readmemb("../../FDP.srcs/sources_1/new/bg_rom0.bin", rom0);
-        $readmemb("../../FDP.srcs/sources_1/new/bg_rom1.bin", rom1);
-        $readmemb("../../FDP.srcs/sources_1/new/bg_rom2.bin", rom2);
-    `else
-        $readmemb("../../../../FDP.srcs/sources_1/new/bg_rom0.bin", rom0);
-        $readmemb("../../../../FDP.srcs/sources_1/new/bg_rom1.bin", rom1);
-        $readmemb("../../../../FDP.srcs/sources_1/new/bg_rom2.bin", rom2);
-    `endif
-    end
-
-    wire [12:0] addr = ({vcount, 6'd0} + {vcount, 5'd0}) + {6'd0, hcount};
-
-    reg [7:0] frame_cnt;
-    reg bg_sel;
-
-    always @(posedge CLOCK) begin
-        if (frame_begin) begin
-            if (frame_cnt == 8'd202) begin
-                frame_cnt <= 0;
-                bg_sel <= ~bg_sel;
-            end else begin
-                frame_cnt <= frame_cnt + 1;
-            end
-        end    
-    end
-
-    wire [15:0] auto_pixel = bg_sel ? rom1[addr] : rom0[addr]; 
-    assign pixel = game_started ? rom2[addr] : auto_pixel;
-endmodule
+//////////////////////////////////////////////////////////////////////////////////
+// Company: 
+// Engineer: 
+// 
+// Create Date: 08.04.2026 18:42:48
+// Design Name: 
+// Module Name: render
+// Project Name: 
+// Target Devices: 
+// Tool Versions: 
+// Description: 
+// 
+// Dependencies: 
+// 
+// Revision:
+// Revision 0.01 - File Created
+// Additional Comments:
+// 
+//////////////////////////////////////////////////////////////////////////////////
 
 module render(
     input         CLOCK,
@@ -423,8 +310,8 @@ module render(
                     (pix_x >= proj_x) && (pix_x <= proj_x + 7'd1) &&
                     (pix_y >= proj_y) && (pix_y <= proj_y + 6'd1);
 
-    wire trail_dotted = trail_pixel && ((pix_x[0] ^ pix_y[0]) == 1'b0);
-
+    //wire trail_dotted = trail_pixel && ((pix_x[0] ^ pix_y[0]) == 1'b0);
+    wire trail_dotted = trail_pixel;
     // NO terrain rendering - terrain_hit removed
 
     wire gameover_banner = (game_phase == PH_GAMEOVER) &&
