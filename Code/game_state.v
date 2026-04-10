@@ -134,7 +134,7 @@ module game_state(
 
     // Latched skill parameters at fire time
     reg [5:0]  fire_skill_damage;
-    reg [3:0]  fire_skill_blast;
+    reg [4:0]  fire_skill_blast;
     reg [1:0]  fire_skill_type;
     reg [3:0]  fire_skill_cost;
 
@@ -165,7 +165,7 @@ module game_state(
     reg [1:0]  current_enemy_idx;
 
     reg [5:0]  skill_damage;
-    reg [3:0]  skill_blast;
+    reg [4:0]  skill_blast;
     reg [3:0]  skill_energy_cost;
     reg [1:0]  skill_type;  // 0=basic, 1=spread, 2=explosive_radius, 3=explosive_damage
 
@@ -312,26 +312,26 @@ endfunction
     always @(*) begin
         case (skill_sel)
             // Basic projectiles (0-4): increasing damage, small blast
-            4'd0:  begin skill_damage = 6'd10; skill_blast = 4'd2; skill_energy_cost = 4'd0;  skill_type = 2'd0; end
-            4'd1:  begin skill_damage = 6'd13; skill_blast = 4'd2; skill_energy_cost = 4'd1;  skill_type = 2'd0; end
-            4'd2:  begin skill_damage = 6'd16; skill_blast = 4'd2; skill_energy_cost = 4'd2;  skill_type = 2'd0; end
-            4'd3:  begin skill_damage = 6'd19; skill_blast = 4'd3; skill_energy_cost = 4'd3;  skill_type = 2'd0; end
-            4'd4:  begin skill_damage = 6'd22; skill_blast = 4'd3; skill_energy_cost = 4'd4;  skill_type = 2'd0; end
+            4'd0:  begin skill_damage = 6'd10; skill_blast = 5'd2; skill_energy_cost = 4'd0;  skill_type = 2'd0; end
+            4'd1:  begin skill_damage = 6'd13; skill_blast = 5'd2; skill_energy_cost = 4'd1;  skill_type = 2'd0; end
+            4'd2:  begin skill_damage = 6'd16; skill_blast = 5'd2; skill_energy_cost = 4'd2;  skill_type = 2'd0; end
+            4'd3:  begin skill_damage = 6'd19; skill_blast = 5'd3; skill_energy_cost = 4'd3;  skill_type = 2'd0; end
+            4'd4:  begin skill_damage = 6'd22; skill_blast = 5'd3; skill_energy_cost = 4'd4;  skill_type = 2'd0; end
             // Spread projectiles (5-8): three shots, increasing damage
-            4'd5:  begin skill_damage = 6'd12; skill_blast = 4'd2; skill_energy_cost = 4'd5;  skill_type = 2'd1; end
-            4'd6:  begin skill_damage = 6'd15; skill_blast = 4'd2; skill_energy_cost = 4'd6;  skill_type = 2'd1; end
-            4'd7:  begin skill_damage = 6'd18; skill_blast = 4'd3; skill_energy_cost = 4'd7;  skill_type = 2'd1; end
-            4'd8:  begin skill_damage = 6'd21; skill_blast = 4'd3; skill_energy_cost = 4'd8;  skill_type = 2'd1; end
+            4'd5:  begin skill_damage = 6'd12; skill_blast = 5'd2; skill_energy_cost = 4'd5;  skill_type = 2'd1; end
+            4'd6:  begin skill_damage = 6'd15; skill_blast = 5'd2; skill_energy_cost = 4'd6;  skill_type = 2'd1; end
+            4'd7:  begin skill_damage = 6'd18; skill_blast = 5'd3; skill_energy_cost = 4'd7;  skill_type = 2'd1; end
+            4'd8:  begin skill_damage = 6'd21; skill_blast = 5'd3; skill_energy_cost = 4'd8;  skill_type = 2'd1; end
             // Explosive radius (9-12): single shot, increasing blast radius
-            4'd9:  begin skill_damage = 6'd15; skill_blast = 4'd20; skill_energy_cost = 4'd9;  skill_type = 2'd2; end
-            4'd10: begin skill_damage = 6'd15; skill_blast = 4'd25; skill_energy_cost = 4'd10; skill_type = 2'd2; end
-            4'd11: begin skill_damage = 6'd20; skill_blast = 4'd25; skill_energy_cost = 4'd11; skill_type = 2'd2; end
-            4'd12: begin skill_damage = 6'd20; skill_blast = 4'd30; skill_energy_cost = 4'd12; skill_type = 2'd2; end
+            4'd9:  begin skill_damage = 6'd15; skill_blast = 5'd20; skill_energy_cost = 4'd9;  skill_type = 2'd2; end
+            4'd10: begin skill_damage = 6'd15; skill_blast = 5'd25; skill_energy_cost = 4'd10; skill_type = 2'd2; end
+            4'd11: begin skill_damage = 6'd20; skill_blast = 5'd25; skill_energy_cost = 4'd11; skill_type = 2'd2; end
+            4'd12: begin skill_damage = 6'd20; skill_blast = 5'd30; skill_energy_cost = 4'd12; skill_type = 2'd2; end
             // Explosive damage (13-15): single shot, big damage
-            4'd13: begin skill_damage = 6'd40; skill_blast = 4'd15; skill_energy_cost = 4'd13; skill_type = 2'd3; end
-            4'd14: begin skill_damage = 6'd50; skill_blast = 4'd15; skill_energy_cost = 4'd14; skill_type = 2'd3; end
-            4'd15: begin skill_damage = 6'd63; skill_blast = 4'd15; skill_energy_cost = 4'd15; skill_type = 2'd3; end
-            default: begin skill_damage = 6'd10; skill_blast = 4'd2; skill_energy_cost = 4'd0; skill_type = 2'd0; end
+            4'd13: begin skill_damage = 6'd40; skill_blast = 5'd15; skill_energy_cost = 4'd13; skill_type = 2'd3; end
+            4'd14: begin skill_damage = 6'd50; skill_blast = 5'd15; skill_energy_cost = 4'd14; skill_type = 2'd3; end
+            4'd15: begin skill_damage = 6'd63; skill_blast = 5'd15; skill_energy_cost = 4'd15; skill_type = 2'd3; end
+            default: begin skill_damage = 6'd10; skill_blast = 5'd2; skill_energy_cost = 4'd0; skill_type = 2'd0; end
         endcase
     end
 
