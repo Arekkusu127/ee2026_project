@@ -780,8 +780,8 @@ endfunction
                             proj_x <= ent_px(player_entity);
                             proj_y <= ent_py(player_entity);
                             
-                            // Store explosion radius for this shot
-                            explosion_radius <= effective_blast;
+                            // Store explosion radius for this shot (latched at fire time)
+                            explosion_radius <= fire_skill_blast;
                         end else begin
                             case (current_enemy_idx)
                                 2'd0: begin
@@ -925,70 +925,16 @@ endfunction
                     next_enemy_hp2   = real_hp_enemy[2];
                     next_enemy_alive = enemy_alive;
                     player_hit_boss  <= 0;
-            
+
                     if (is_player_turn) begin
-                        if (explosion_pending) begin
-                            // Handle area damage for explosive skills
-                            if (fire_skill_type == 2'd2 || fire_skill_type == 2'd3) begin
-                                // Check all enemies within explosion radius
-                                if (!current_round) begin
-                                    // Check slime 0
-                                    if (enemy_alive[0]) begin
-                                        if (manhattan(explosion_center_x, explosion_center_y, 
-                                                    slime0_x + 7'd7, slime_y + 6'd4) <= {3'd0, explosion_radius}) begin
-                                            if (next_enemy_hp0 <= {3'd0, fire_skill_damage}) begin
-                                                hit_event           <= 1'b1;
-                                                hit_damage          <= next_enemy_hp0[7:0];
-                                                next_enemy_hp0      = 9'd0;
-                                                next_enemy_alive[0] = 1'b0;
-                                            end else begin
-                                                hit_event      <= 1'b1;
-                                                hit_damage     <= {2'd0, fire_skill_damage};
-                                                next_enemy_hp0 = next_enemy_hp0 - {3'd0, fire_skill_damage};
-                                            end
-                                        end
-                                    end
-                                    // Check slime 1
-                                    if (enemy_alive[1]) begin
-                                        if (manhattan(explosion_center_x, explosion_center_y,
-                                                    slime1_x + 7'd7, slime_y + 6'd4) <= {3'd0, explosion_radius}) begin
-                                            if (next_enemy_hp1 <= {3'd0, fire_skill_damage}) begin
-                                                hit_event           <= 1'b1;
-                                                hit_damage          <= next_enemy_hp1[7:0];
-                                                next_enemy_hp1      = 9'd0;
-                                                next_enemy_alive[1] = 1'b0;
-                                            end else begin
-                                                hit_event      <= 1'b1;
-                                                hit_damage     <= {2'd0, fire_skill_damage};
-                                                next_enemy_hp1 = next_enemy_hp1 - {3'd0, fire_skill_damage};
-                                            end
-                                        end
-                                    end
-                                end else begin
-                                    // Check boss
-                                    if (enemy_alive[0]) begin
-                                        if (manhattan(explosion_center_x, explosion_center_y,
-                                                    BOSS_SPRITE_LEFT + 7'd20, BOSS_SPRITE_TOP + 6'd25) <= {3'd0, explosion_radius}) begin
-                                            if (next_enemy_hp0 <= {3'd0, fire_skill_damage}) begin
-                                                hit_event           <= 1'b1;
-                                                hit_damage          <= next_enemy_hp0[7:0];
-                                                next_enemy_hp0      = 9'd0;
-                                                next_enemy_alive[0] = 1'b0;
-                                            end else begin
-                                                hit_event      <= 1'b1;
-                                                hit_damage     <= {2'd0, fire_skill_damage};
-                                                next_enemy_hp0 = next_enemy_hp0 - {3'd0, fire_skill_damage};
-                                            end
-                                        end
-                                    end
-                                end
-                            end else begin
-                                // Single-target damage for basic and spread shots
-                                if (!current_round) begin
-                                    // Player attacks slime 0
-                                    if (enemy_alive[0] &&
-                                        proj_x >= slime0_x && proj_x <= slime0_x + 7'd13 &&
-                                        proj_y >= slime_y  && proj_y <= slime_y  + 6'd8) begin
+                        // Handle area damage for explosive skills (type 2 or 3)
+                        if (fire_skill_type == 2'd2 || fire_skill_type == 2'd3) begin
+                            // Check all enemies within explosion radius
+                            if (!current_round) begin
+                                // Check slime 0
+                                if (enemy_alive[0]) begin
+                                    if (manhattan(explosion_center_x, explosion_center_y, 
+                                                slime0_x + 7'd7, slime_y + 6'd4) <= {3'd0, explosion_radius}) begin
                                         if (next_enemy_hp0 <= {3'd0, fire_skill_damage}) begin
                                             hit_event           <= 1'b1;
                                             hit_damage          <= next_enemy_hp0[7:0];
@@ -1000,10 +946,11 @@ endfunction
                                             next_enemy_hp0 = next_enemy_hp0 - {3'd0, fire_skill_damage};
                                         end
                                     end
-                                    // Player attacks slime 1
-                                    if (enemy_alive[1] &&
-                                        proj_x >= slime1_x && proj_x <= slime1_x + 7'd13 &&
-                                        proj_y >= slime_y  && proj_y <= slime_y  + 6'd8) begin
+                                end
+                                // Check slime 1
+                                if (enemy_alive[1]) begin
+                                    if (manhattan(explosion_center_x, explosion_center_y,
+                                                slime1_x + 7'd7, slime_y + 6'd4) <= {3'd0, explosion_radius}) begin
                                         if (next_enemy_hp1 <= {3'd0, fire_skill_damage}) begin
                                             hit_event           <= 1'b1;
                                             hit_damage          <= next_enemy_hp1[7:0];
@@ -1015,14 +962,12 @@ endfunction
                                             next_enemy_hp1 = next_enemy_hp1 - {3'd0, fire_skill_damage};
                                         end
                                     end
-                                end else begin
-                                    // Player attacks boss
-                                    if (enemy_alive[0] &&
-                                        proj_x >= BOSS_SPRITE_LEFT &&
-                                        proj_x < BOSS_SPRITE_LEFT + BOSS_SPRITE_W &&
-                                        proj_y >= BOSS_SPRITE_TOP &&
-                                        proj_y < BOSS_SPRITE_TOP + BOSS_SPRITE_H) begin
-                                        player_hit_boss = 1;
+                                end
+                            end else begin
+                                // Check boss
+                                if (enemy_alive[0]) begin
+                                    if (manhattan(explosion_center_x, explosion_center_y,
+                                                BOSS_SPRITE_LEFT + 7'd20, BOSS_SPRITE_TOP + 6'd25) <= {3'd0, explosion_radius}) begin
                                         if (next_enemy_hp0 <= {3'd0, fire_skill_damage}) begin
                                             hit_event           <= 1'b1;
                                             hit_damage          <= next_enemy_hp0[7:0];
@@ -1033,6 +978,59 @@ endfunction
                                             hit_damage     <= {2'd0, fire_skill_damage};
                                             next_enemy_hp0 = next_enemy_hp0 - {3'd0, fire_skill_damage};
                                         end
+                                    end
+                                end
+                            end
+                        end else begin
+                            // Single-target damage for basic and spread shots
+                            if (!current_round) begin
+                                // Player attacks slime 0
+                                if (enemy_alive[0] &&
+                                    proj_x >= slime0_x && proj_x <= slime0_x + 7'd13 &&
+                                    proj_y >= slime_y  && proj_y <= slime_y  + 6'd8) begin
+                                    if (next_enemy_hp0 <= {3'd0, fire_skill_damage}) begin
+                                        hit_event           <= 1'b1;
+                                        hit_damage          <= next_enemy_hp0[7:0];
+                                        next_enemy_hp0      = 9'd0;
+                                        next_enemy_alive[0] = 1'b0;
+                                    end else begin
+                                        hit_event      <= 1'b1;
+                                        hit_damage     <= {2'd0, fire_skill_damage};
+                                        next_enemy_hp0 = next_enemy_hp0 - {3'd0, fire_skill_damage};
+                                    end
+                                end
+                                // Player attacks slime 1
+                                if (enemy_alive[1] &&
+                                    proj_x >= slime1_x && proj_x <= slime1_x + 7'd13 &&
+                                    proj_y >= slime_y  && proj_y <= slime_y  + 6'd8) begin
+                                    if (next_enemy_hp1 <= {3'd0, fire_skill_damage}) begin
+                                        hit_event           <= 1'b1;
+                                        hit_damage          <= next_enemy_hp1[7:0];
+                                        next_enemy_hp1      = 9'd0;
+                                        next_enemy_alive[1] = 1'b0;
+                                    end else begin
+                                        hit_event      <= 1'b1;
+                                        hit_damage     <= {2'd0, fire_skill_damage};
+                                        next_enemy_hp1 = next_enemy_hp1 - {3'd0, fire_skill_damage};
+                                    end
+                                end
+                            end else begin
+                                // Player attacks boss
+                                if (enemy_alive[0] &&
+                                    proj_x >= BOSS_SPRITE_LEFT &&
+                                    proj_x < BOSS_SPRITE_LEFT + BOSS_SPRITE_W &&
+                                    proj_y >= BOSS_SPRITE_TOP &&
+                                    proj_y < BOSS_SPRITE_TOP + BOSS_SPRITE_H) begin
+                                    player_hit_boss = 1;
+                                    if (next_enemy_hp0 <= {3'd0, fire_skill_damage}) begin
+                                        hit_event           <= 1'b1;
+                                        hit_damage          <= next_enemy_hp0[7:0];
+                                        next_enemy_hp0      = 9'd0;
+                                        next_enemy_alive[0] = 1'b0;
+                                    end else begin
+                                        hit_event      <= 1'b1;
+                                        hit_damage     <= {2'd0, fire_skill_damage};
+                                        next_enemy_hp0 = next_enemy_hp0 - {3'd0, fire_skill_damage};
                                     end
                                 end
                             end
