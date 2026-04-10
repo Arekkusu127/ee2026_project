@@ -323,11 +323,29 @@ module render(
     );  
 
     reg explosion_pending_d;
+    reg bomb_active_latch;
+    reg [5:0] bomb_frame_count;
     wire explosion_trigger_pulse = explosion_pending && !explosion_pending_d;
 
     always @(posedge CLOCK) begin
         explosion_pending_d <= explosion_pending;
     end
+    
+    always @(posedge CLOCK or negedge game_started) begin
+        if (!game_started) begin
+            bomb_active_latch <= 0;
+            bomb_frame_count <= 0;
+        end else if (explosion_pending && !bomb_active_latch) begin
+            bomb_active_latch <= 1;
+            bomb_frame_count <= 6'd30;  // 30 frames
+        end else if (bomb_active_latch && frame_begin) begin
+            if (bomb_frame_count == 0)
+                bomb_active_latch <= 0;
+            else
+                bomb_frame_count <= bomb_frame_count - 1;
+        end
+    end
+    
     wire [6:0] bomb_left = (explosion_center_x >= 7'd3) ? (explosion_center_x - 7'd3) : 7'd0;
     wire [5:0] bomb_top  = (explosion_center_y >= 6'd3) ? (explosion_center_y - 6'd3) : 6'd0;
 
@@ -344,7 +362,7 @@ module render(
         .CLOCK(CLOCK),
         .rst(!game_started),
         .frame_begin(frame_begin),
-        .trigger(explosion_trigger_pulse),
+        .trigger(bomb_active_latch),
         .x_pos(bomb_local_x),
         .y_pos(bomb_local_y),
         .pixel(bomb_pixel),
