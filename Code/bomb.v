@@ -2,7 +2,7 @@ module bomb(
     input        CLOCK,
     input        rst,
     input        frame_begin,
-    input        explosion_pending,         // 1-cycle pulse when a new explosion starts
+    input        trigger,       // 1-cycle pulse
     input  [2:0] x_pos,
     input  [2:0] y_pos,
     output [15:0] pixel,
@@ -10,6 +10,7 @@ module bomb(
 );
     reg [15:0] rom0 [0:35];
     reg [15:0] rom1 [0:35];
+
 
     initial begin
     `ifdef SYNTHESIS
@@ -23,54 +24,42 @@ module bomb(
 
     wire [5:0] addr = y_pos * 6 + {3'd0, x_pos};
 
-    // 0 = hidden, 1 = show rom0, 2 = show rom1
-    reg [1:0] anim_state;
-    reg [1:0] hold_cnt;
+    reg        active;
+    reg        frame_sel;      // 0 = rom0, 1 = rom1
+    reg [5:0]  frame_cnt;      // enough for 0..63
 
     always @(posedge CLOCK or posedge rst) begin
         if (rst) begin
-            anim_state <= 2'd0;
-            hold_cnt   <= 2'd0;
+            active    <= 1'b0;
+            frame_sel <= 1'b0;
+            frame_cnt <= 6'd0;
         end
         else if (frame_begin) begin
-            case (anim_state)
-                2'd0: begin
-                    if (explosion_pending) begin
-                        anim_state <= 2'd1; // show bomb1
-                        hold_cnt   <= 2'd0;
-                    end
-                end
+            if (trigger) begin
+                active    <= 1'b1;
+                frame_sel <= 1'b0;
+                frame_cnt <= 6'd0;
+            end
+            else if (active) begin
+                frame_cnt <= frame_cnt + 1'b1;
 
-                2'd1: begin
-                    // hold rom0 briefly, then switch to rom1
-                    if (hold_cnt == 2'd1) begin
-                        anim_state <= 2'd2;
-                        hold_cnt   <= 2'd0;
-                    end else begin
-                        hold_cnt <= hold_cnt + 1'b1;
-                    end
-                end
+                // first half: bomb1, second half: bomb2
+                if (frame_cnt >= 6'd15)
+                    frame_sel <= 1'b1;
 
-                2'd2: begin
-                    // hold rom1 briefly, then disappear
-                    if (hold_cnt == 2'd1) begin
-                        anim_state <= 2'd0;
-                        hold_cnt   <= 2'd0;
-                    end else begin
-                        hold_cnt <= hold_cnt + 1'b1;
-                    end
+                // total about 30 frames ~= 0.5s at 60fps
+                if (frame_cnt >= 6'd29) begin
+                    active    <= 1'b0;
+                    frame_sel <= 1'b0;
+                    frame_cnt <= 6'd0;
                 end
-
-                default: begin
-                    anim_state <= 2'd0;
-                    hold_cnt   <= 2'd0;
-                end
-            endcase
+            end
         end
     end
 
-    wire [15:0] bomb_pixel = (anim_state == 2'd2) ? rom1[addr] : rom0[addr];
+    wire [15:0] bomb_pixel = frame_sel ? rom1[addr] : rom0[addr];
 
     assign pixel   = bomb_pixel;
-    assign visible = (anim_state != 2'd0) && (bomb_pixel != 16'hffff);
+    assign visible = active && (bomb_pixel != 16'hffff);
+
 endmodule
