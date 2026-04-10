@@ -1105,10 +1105,6 @@ module game_state(
                                 boss_attack_active <= 1'b0;
                                 boss_attack_x      <= 7'd0;
                                 boss_beam_hit_player  <= 1'b0;
-                                if (player_energy + 4'd2 > 4'd15)
-                                    player_energy <= 4'd15;
-                                else
-                                    player_energy <= player_energy + 4'd2;
                                 game_phase     <= PH_MOVE;
                             end
                             else begin
