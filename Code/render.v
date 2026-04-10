@@ -266,7 +266,7 @@ module render(
     // full-screen vertical red beam
     wire boss_beam_hit = boss_attack_active &&
                         (pix_x >= boss_attack_x) &&
-                        (pix_x <= boss_attack_x + 7'd1);
+                        (pix_x <= boss_attack_x + 7'd5); // 6 pixels wide
 
     wire in_slime0 = slime_phase && enemy_alive[0] &&
                      (pix_x >= slime0_x) && (pix_x < slime0_x + 7'd14) &&

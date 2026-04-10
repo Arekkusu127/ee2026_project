@@ -778,7 +778,7 @@ module game_state(
                     if (tick_30hz) begin
                         anim_ticks <= anim_ticks + 1;
                         if ((boss_attack_x <= ent_px(player_entity) + {3'd0, ent_hw(player_entity)}) &&
-                            (boss_attack_x + 7'd1 >= ent_px(player_entity) - {3'd0, ent_hw(player_entity)})) begin
+                            (boss_attack_x + 7'd5 >= ent_px(player_entity) - {3'd0, ent_hw(player_entity)})) begin
                             boss_beam_hit_player <= 1'b1;
                         end
                         if (boss_attack_x >= 7'd95) begin
@@ -925,16 +925,15 @@ module game_state(
                     end
                     else if (current_round) begin
                         // Boss beam damages player
-                        if (boss_beam_hit_player) begin
-                            if (next_player_hp <= 9'd50) begin
-                                hit_event      <= 1'b1;
-                                hit_damage     <= next_player_hp[7:0];
-                                next_player_hp = 9'd0;
-                            end else begin
-                                hit_event      <= 1'b1;
-                                hit_damage     <= 8'd50;
-                                next_player_hp = next_player_hp - 9'd50;
-                            end
+                    if (boss_beam_hit_player) begin
+                        if (next_player_hp <= 9'd40) begin
+                            hit_event      <= 1'b1;
+                            hit_damage     <= next_player_hp[7:0];
+                            next_player_hp = 9'd0;
+                        end else begin
+                            hit_event      <= 1'b1;
+                            hit_damage     <= 8'd40;
+                            next_player_hp = next_player_hp - 9'd40;
                         end
                     end
 
