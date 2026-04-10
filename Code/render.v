@@ -322,7 +322,12 @@ module render(
         .visible(slime1_vis)
     );  
 
+    reg explosion_pending_d;
+    wire explosion_trigger_pulse = explosion_pending && !explosion_pending_d;
 
+    always @(posedge CLOCK) begin
+        explosion_pending_d <= explosion_pending;
+    end
     wire [6:0] bomb_left = (explosion_center_x >= 7'd3) ? (explosion_center_x - 7'd3) : 7'd0;
     wire [5:0] bomb_top  = (explosion_center_y >= 6'd3) ? (explosion_center_y - 6'd3) : 6'd0;
 
@@ -339,7 +344,7 @@ module render(
         .CLOCK(CLOCK),
         .rst(!game_started),
         .frame_begin(frame_begin),
-        .explosion_pending(explosion_pending),
+        .trigger(explosion_trigger_pulse),
         .x_pos(bomb_local_x),
         .y_pos(bomb_local_y),
         .pixel(bomb_pixel),
