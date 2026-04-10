@@ -67,6 +67,7 @@ module game_state(
     localparam TYPE_BOSS   = 2'b10;
 
     localparam [9:0] AIM_RADIUS_SQ = 10'd400;
+    localparam EXPLOSION_RADIUS = 4'd8;  // Max explosion radius in pixels
 
     function [45:0] pack_entity;
         input [1:0]  etype;
@@ -183,6 +184,10 @@ module game_state(
 
     // ---- Explosive radius for skill types 2,3 ----
     reg [3:0]  effective_blast;
+    reg [3:0] explosion_radius;
+    reg [6:0] explosion_center_x;
+    reg [5:0] explosion_center_y;
+    reg       explosion_pending;
 
     // ---- Precalculated arc state ----
     reg [1:0]  arc_calc_state;
@@ -698,7 +703,6 @@ module game_state(
                         lut_angle <= (ai_angle > 7'd55) ? 7'd55 : ai_angle;
                     end else if (is_player_turn && skill_type == 2'd1 && spread_idx != 2'd0) begin
                         // For spread shots 1 and 2, adjust lut_angle
-                        // spread_idx 1: angle + 10, spread_idx 2: angle - 10
                         if (spread_idx == 2'd1) begin
                             lut_angle <= (launch_elevation + 7'd10 > 7'd90) ? 7'd90 : launch_elevation + 7'd10;
                         end else begin
@@ -707,10 +711,10 @@ module game_state(
                     end
                     fire_step <= 2'd1;
                 end
-
+            
                 2'd1: begin
                     anim_ticks <= 0;
-
+            
                     if (!is_player_turn && current_round) begin
                         boss_attack_active <= 1'b1;
                         boss_attack_x      <= 7'd0;
@@ -722,23 +726,28 @@ module game_state(
                         proj_active    <= 1;
                         anim_ticks     <= 0;
                         trail_tick_cnt <= 0;
-
+                        explosion_pending <= 0;  // Reset explosion flag
+            
                         if (is_player_turn) begin
                             proj_fx <= {ent_px(player_entity), 8'd128};
                             proj_fy <= {ent_py(player_entity), 8'd0};
-
+            
+                            // Use the current lut_angle (which may be adjusted for spread)
                             if (reticle_right)
                                 proj_vx <= $signed({1'b0, computed_power}) * $signed({1'b0, cos_val});
                             else
                                 proj_vx <= -($signed({1'b0, computed_power}) * $signed({1'b0, cos_val}));
-
+            
                             if (reticle_above)
                                 proj_vy <= -($signed({1'b0, computed_power}) * $signed({1'b0, sin_val}));
                             else
                                 proj_vy <=  $signed({1'b0, computed_power}) * $signed({1'b0, sin_val});
-
+            
                             proj_x <= ent_px(player_entity);
                             proj_y <= ent_py(player_entity);
+                            
+                            // Store explosion radius for this shot
+                            explosion_radius <= effective_blast;
                         end else begin
                             case (current_enemy_idx)
                                 2'd0: begin
@@ -762,8 +771,9 @@ module game_state(
                             endcase
                             proj_vx <= -($signed({1'b0, ai_power}) * $signed({1'b0, cos_val}));
                             proj_vy <= -($signed({1'b0, ai_power}) * $signed({1'b0, sin_val}));
+                            explosion_radius <= 4'd2;  // Enemy explosions are small
                         end
-
+            
                         game_phase <= PH_ANIMATE;
                         fire_step  <= 0;
                     end
@@ -771,7 +781,7 @@ module game_state(
                 default: fire_step <= 2'd0;
                 endcase
             end
-
+            
             // ===== ANIMATE =====
             PH_ANIMATE: begin
                 if (!is_player_turn && current_round && boss_attack_active) begin
@@ -824,6 +834,10 @@ module game_state(
                                 proj_fx[14:8] >= slime0_x && proj_fx[14:8] <= slime0_x + 7'd13 &&
                                 proj_fy[13:8] >= slime_y  && proj_fy[13:8] <= slime_y  + 6'd8) begin
                                 proj_active  <= 0;
+                                // Store explosion center for area damage
+                                explosion_center_x <= proj_fx[14:8];
+                                explosion_center_y <= proj_fy[13:8];
+                                explosion_pending <= 1;
                                 game_phase   <= PH_RESOLVE;
                                 resolve_step <= 0;
                             end
@@ -831,17 +845,23 @@ module game_state(
                                 proj_fx[14:8] >= slime1_x && proj_fx[14:8] <= slime1_x + 7'd13 &&
                                 proj_fy[13:8] >= slime_y  && proj_fy[13:8] <= slime_y  + 6'd8) begin
                                 proj_active  <= 0;
+                                explosion_center_x <= proj_fx[14:8];
+                                explosion_center_y <= proj_fy[13:8];
+                                explosion_pending <= 1;
                                 game_phase   <= PH_RESOLVE;
                                 resolve_step <= 0;
                             end
                         end else begin
-                            // Round 2: hit boss using SPRITE bounding box (not entity coords)
+                            // Round 2: hit boss using SPRITE bounding box
                             if (enemy_alive[0] &&
                                 proj_fx[14:8] >= BOSS_SPRITE_LEFT &&
                                 proj_fx[14:8] < BOSS_SPRITE_LEFT + BOSS_SPRITE_W &&
                                 proj_fy[13:8] >= BOSS_SPRITE_TOP &&
                                 proj_fy[13:8] < BOSS_SPRITE_TOP + BOSS_SPRITE_H) begin
                                 proj_active  <= 0;
+                                explosion_center_x <= proj_fx[14:8];
+                                explosion_center_y <= proj_fy[13:8];
+                                explosion_pending <= 1;
                                 game_phase   <= PH_RESOLVE;
                                 resolve_step <= 0;
                             end
@@ -870,76 +890,135 @@ module game_state(
                     next_enemy_hp1   = real_hp_enemy[1];
                     next_enemy_hp2   = real_hp_enemy[2];
                     next_enemy_alive = enemy_alive;
-
+            
                     if (is_player_turn) begin
-                        if (!current_round) begin
-                            // Player attacks slime 0
-                            if (enemy_alive[0] &&
-                                proj_x >= slime0_x && proj_x <= slime0_x + 7'd13 &&
-                                proj_y >= slime_y  && proj_y <= slime_y  + 6'd8) begin
-                                if (next_enemy_hp0 <= {3'd0, skill_damage}) begin
-                                    hit_event           <= 1'b1;
-                                    hit_damage          <= next_enemy_hp0[7:0];
-                                    next_enemy_hp0      = 9'd0;
-                                    next_enemy_alive[0] = 1'b0;
+                        if (explosion_pending) begin
+                            // Handle area damage for explosive skills
+                            if (skill_type == 2'd2 || skill_type == 2'd3) begin
+                                // Check all enemies within explosion radius
+                                if (!current_round) begin
+                                    // Check slime 0
+                                    if (enemy_alive[0]) begin
+                                        if (manhattan(explosion_center_x, explosion_center_y, 
+                                                    slime0_x + 7'd7, slime_y + 6'd4) <= {4'd0, explosion_radius}) begin
+                                            if (next_enemy_hp0 <= {3'd0, skill_damage}) begin
+                                                hit_event           <= 1'b1;
+                                                hit_damage          <= next_enemy_hp0[7:0];
+                                                next_enemy_hp0      = 9'd0;
+                                                next_enemy_alive[0] = 1'b0;
+                                            end else begin
+                                                hit_event      <= 1'b1;
+                                                hit_damage     <= {2'd0, skill_damage};
+                                                next_enemy_hp0 = next_enemy_hp0 - {3'd0, skill_damage};
+                                            end
+                                        end
+                                    end
+                                    // Check slime 1
+                                    if (enemy_alive[1]) begin
+                                        if (manhattan(explosion_center_x, explosion_center_y,
+                                                    slime1_x + 7'd7, slime_y + 6'd4) <= {4'd0, explosion_radius}) begin
+                                            if (next_enemy_hp1 <= {3'd0, skill_damage}) begin
+                                                hit_event           <= 1'b1;
+                                                hit_damage          <= next_enemy_hp1[7:0];
+                                                next_enemy_hp1      = 9'd0;
+                                                next_enemy_alive[1] = 1'b0;
+                                            end else begin
+                                                hit_event      <= 1'b1;
+                                                hit_damage     <= {2'd0, skill_damage};
+                                                next_enemy_hp1 = next_enemy_hp1 - {3'd0, skill_damage};
+                                            end
+                                        end
+                                    end
                                 end else begin
-                                    hit_event      <= 1'b1;
-                                    hit_damage     <= {2'd0, skill_damage};
-                                    next_enemy_hp0 = next_enemy_hp0 - {3'd0, skill_damage};
+                                    // Check boss
+                                    if (enemy_alive[0]) begin
+                                        if (manhattan(explosion_center_x, explosion_center_y,
+                                                    BOSS_SPRITE_LEFT + 7'd20, BOSS_SPRITE_TOP + 6'd25) <= {4'd0, explosion_radius}) begin
+                                            if (next_enemy_hp0 <= {3'd0, skill_damage}) begin
+                                                hit_event           <= 1'b1;
+                                                hit_damage          <= next_enemy_hp0[7:0];
+                                                next_enemy_hp0      = 9'd0;
+                                                next_enemy_alive[0] = 1'b0;
+                                            end else begin
+                                                hit_event      <= 1'b1;
+                                                hit_damage     <= {2'd0, skill_damage};
+                                                next_enemy_hp0 = next_enemy_hp0 - {3'd0, skill_damage};
+                                            end
+                                        end
+                                    end
                                 end
-                            end
-                            // Player attacks slime 1
-                            if (enemy_alive[1] &&
-                                proj_x >= slime1_x && proj_x <= slime1_x + 7'd13 &&
-                                proj_y >= slime_y  && proj_y <= slime_y  + 6'd8) begin
-                                if (next_enemy_hp1 <= {3'd0, skill_damage}) begin
-                                    hit_event           <= 1'b1;
-                                    hit_damage          <= next_enemy_hp1[7:0];
-                                    next_enemy_hp1      = 9'd0;
-                                    next_enemy_alive[1] = 1'b0;
+                            end else begin
+                                // Single-target damage for basic and spread shots
+                                if (!current_round) begin
+                                    // Player attacks slime 0
+                                    if (enemy_alive[0] &&
+                                        proj_x >= slime0_x && proj_x <= slime0_x + 7'd13 &&
+                                        proj_y >= slime_y  && proj_y <= slime_y  + 6'd8) begin
+                                        if (next_enemy_hp0 <= {3'd0, skill_damage}) begin
+                                            hit_event           <= 1'b1;
+                                            hit_damage          <= next_enemy_hp0[7:0];
+                                            next_enemy_hp0      = 9'd0;
+                                            next_enemy_alive[0] = 1'b0;
+                                        end else begin
+                                            hit_event      <= 1'b1;
+                                            hit_damage     <= {2'd0, skill_damage};
+                                            next_enemy_hp0 = next_enemy_hp0 - {3'd0, skill_damage};
+                                        end
+                                    end
+                                    // Player attacks slime 1
+                                    if (enemy_alive[1] &&
+                                        proj_x >= slime1_x && proj_x <= slime1_x + 7'd13 &&
+                                        proj_y >= slime_y  && proj_y <= slime_y  + 6'd8) begin
+                                        if (next_enemy_hp1 <= {3'd0, skill_damage}) begin
+                                            hit_event           <= 1'b1;
+                                            hit_damage          <= next_enemy_hp1[7:0];
+                                            next_enemy_hp1      = 9'd0;
+                                            next_enemy_alive[1] = 1'b0;
+                                        end else begin
+                                            hit_event      <= 1'b1;
+                                            hit_damage     <= {2'd0, skill_damage};
+                                            next_enemy_hp1 = next_enemy_hp1 - {3'd0, skill_damage};
+                                        end
+                                    end
                                 end else begin
-                                    hit_event      <= 1'b1;
-                                    hit_damage     <= {2'd0, skill_damage};
-                                    next_enemy_hp1 = next_enemy_hp1 - {3'd0, skill_damage};
-                                end
-                            end
-                        end else begin
-                            // Player attacks boss - USE SPRITE BOUNDING BOX
-                            if (enemy_alive[0] &&
-                                proj_x >= BOSS_SPRITE_LEFT &&
-                                proj_x < BOSS_SPRITE_LEFT + BOSS_SPRITE_W &&
-                                proj_y >= BOSS_SPRITE_TOP &&
-                                proj_y < BOSS_SPRITE_TOP + BOSS_SPRITE_H) begin
-                                if (next_enemy_hp0 <= {3'd0, skill_damage}) begin
-                                    hit_event           <= 1'b1;
-                                    hit_damage          <= next_enemy_hp0[7:0];
-                                    next_enemy_hp0      = 9'd0;
-                                    next_enemy_alive[0] = 1'b0;
-                                end else begin
-                                    hit_event      <= 1'b1;
-                                    hit_damage     <= {2'd0, skill_damage};
-                                    next_enemy_hp0 = next_enemy_hp0 - {3'd0, skill_damage};
+                                    // Player attacks boss
+                                    if (enemy_alive[0] &&
+                                        proj_x >= BOSS_SPRITE_LEFT &&
+                                        proj_x < BOSS_SPRITE_LEFT + BOSS_SPRITE_W &&
+                                        proj_y >= BOSS_SPRITE_TOP &&
+                                        proj_y < BOSS_SPRITE_TOP + BOSS_SPRITE_H) begin
+                                        if (next_enemy_hp0 <= {3'd0, skill_damage}) begin
+                                            hit_event           <= 1'b1;
+                                            hit_damage          <= next_enemy_hp0[7:0];
+                                            next_enemy_hp0      = 9'd0;
+                                            next_enemy_alive[0] = 1'b0;
+                                        end else begin
+                                            hit_event      <= 1'b1;
+                                            hit_damage     <= {2'd0, skill_damage};
+                                            next_enemy_hp0 = next_enemy_hp0 - {3'd0, skill_damage};
+                                        end
+                                    end
                                 end
                             end
                         end
                     end
                     else if (current_round) begin
-                        // Boss beam damages player
-                    if (boss_beam_hit_player) begin
-                        if (next_player_hp <= 9'd40) begin
-                            hit_event      <= 1'b1;
-                            hit_damage     <= next_player_hp[7:0];
-                            next_player_hp = 9'd0;
-                        end else begin
-                            hit_event      <= 1'b1;
-                            hit_damage     <= 8'd40;
-                            next_player_hp = next_player_hp - 9'd40;
+                        // Boss beam damages player (keep existing code)
+                        if (boss_beam_hit_player) begin
+                            if (next_player_hp <= 9'd40) begin
+                                hit_event      <= 1'b1;
+                                hit_damage     <= next_player_hp[7:0];
+                                next_player_hp = 9'd0;
+                            end else begin
+                                hit_event      <= 1'b1;
+                                hit_damage     <= 8'd40;
+                                next_player_hp = next_player_hp - 9'd40;
+                            end
                         end
                     end
-
-                    // Accumulate spread damage
+            
+                    // Accumulate spread damage (keep existing code)
                     if (is_player_turn && skill_type == 2'd1) begin
-                        // Store current projectile's damage contribution
                         if (!current_round) begin
                             spread_dmg_enemy0 <= spread_dmg_enemy0 + (real_hp_enemy[0] - next_enemy_hp0);
                             spread_dmg_enemy1 <= spread_dmg_enemy1 + (real_hp_enemy[1] - next_enemy_hp1);
@@ -947,13 +1026,13 @@ module game_state(
                             spread_dmg_boss <= spread_dmg_boss + (real_hp_enemy[0] - next_enemy_hp0);
                         end
                     end
-
+            
                     real_hp_player    <= next_player_hp;
                     real_hp_enemy[0]  <= next_enemy_hp0;
                     real_hp_enemy[1]  <= next_enemy_hp1;
                     real_hp_enemy[2]  <= next_enemy_hp2;
                     enemy_alive       <= next_enemy_alive;
-
+            
                     player_entity  <= set_hp(player_entity,
                         (next_player_hp[8:2] > 6'd63) ? 6'd63 : next_player_hp[8:2]);
                     enemy_entity_0 <= set_hp(enemy_entity_0,
@@ -961,11 +1040,13 @@ module game_state(
                     enemy_entity_1 <= set_hp(enemy_entity_1,
                         (next_enemy_hp1 > 9'd63) ? 6'd63 : next_enemy_hp1[5:0]);
                     enemy_entity_2 <= 46'd0;
-
+            
                     // Check if more spread projectiles to fire
                     if (is_player_turn && skill_type == 2'd1 && spread_idx + 2'd1 < spread_count) begin
                         // More spread shots remaining
                         spread_idx   <= spread_idx + 2'd1;
+                        // Reset explosion flag for next projectile
+                        explosion_pending <= 0;
                         // Go back to FIRE phase for next spread projectile
                         game_phase   <= PH_FIRE;
                         fire_step    <= 0;
@@ -973,7 +1054,7 @@ module game_state(
                         trail_clear  <= 1;
                         resolve_step <= 0;
                     end else begin
-                        // All projectiles resolved - check win/loss
+                        // All projectiles resolved - check win/loss (keep existing code)
                         if (next_player_hp == 9'd0) begin
                             defeat     <= 1'b1;
                             game_phase <= PH_GAMEOVER;
@@ -981,11 +1062,10 @@ module game_state(
                         else if (next_enemy_alive == 3'b000) begin
                             if (!current_round) begin
                                 current_round     <= 1'b1;
-                                // Energy carries over, no reset here
                                 is_player_turn    <= 1'b1;
                                 current_enemy_idx <= 2'd0;
                                 player_fuel       <= 4'd10;
-
+            
                                 enemy_entity_0    <= pack_entity(TYPE_BOSS, 6'd63, 6'd30, 6'd40, 6'd0,
                                                                  7'd75, 6'd32, 4'd5, 3'd4);
                                 enemy_entity_1    <= 46'd0;
@@ -994,7 +1074,7 @@ module game_state(
                                 real_hp_enemy[1]  <= 9'd0;
                                 real_hp_enemy[2]  <= 9'd0;
                                 enemy_alive       <= 3'b001;
-
+            
                                 game_phase        <= PH_MOVE;
                             end else begin
                                 victory    <= 1'b1;
@@ -1005,7 +1085,6 @@ module game_state(
                             if (!current_round) begin
                                 is_player_turn <= 1'b1;
                                 player_fuel    <= 4'd10;
-                                // Energy regen +2 per turn (capped at 15)
                                 if (player_energy + 4'd2 > 4'd15)
                                     player_energy <= 4'd15;
                                 else
@@ -1021,7 +1100,7 @@ module game_state(
                 default: resolve_step <= 3'd0;
                 endcase
             end
-
+            
             // ===== NEXT TURN =====
             PH_NEXTTURN: begin
                 if (!current_round) begin
