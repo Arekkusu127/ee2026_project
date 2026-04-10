@@ -67,12 +67,12 @@ module background(
     end
 
     // --- Intro counter: holds rom3 for 300 frames (~5s at 60fps) ---
-    localparam INTRO_FRAMES = 9'd300;
-    reg [8:0] intro_cnt;
+    localparam INTRO_FRAMES = 13'd4800;
+    reg [12:0] intro_cnt;
     reg intro_done;
 
     initial begin
-        intro_cnt = 9'd0;
+        intro_cnt = 13'd0;
         intro_done = 1'b0;   // <-- ensures rom3 is shown first
     end
 
