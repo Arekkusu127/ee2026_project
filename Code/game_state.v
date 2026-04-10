@@ -322,14 +322,14 @@ endfunction
             4'd7:  begin skill_damage = 6'd18; skill_blast = 4'd3; skill_energy_cost = 4'd7;  skill_type = 2'd1; end
             4'd8:  begin skill_damage = 6'd21; skill_blast = 4'd3; skill_energy_cost = 4'd8;  skill_type = 2'd1; end
             // Explosive radius (9-12): single shot, increasing blast radius
-            4'd9:  begin skill_damage = 6'd20; skill_blast = 4'd5; skill_energy_cost = 4'd9;  skill_type = 2'd2; end
-            4'd10: begin skill_damage = 6'd22; skill_blast = 4'd6; skill_energy_cost = 4'd10; skill_type = 2'd2; end
-            4'd11: begin skill_damage = 6'd24; skill_blast = 4'd7; skill_energy_cost = 4'd11; skill_type = 2'd2; end
-            4'd12: begin skill_damage = 6'd26; skill_blast = 4'd8; skill_energy_cost = 4'd12; skill_type = 2'd2; end
+            4'd9:  begin skill_damage = 6'd15; skill_blast = 4'd20; skill_energy_cost = 4'd9;  skill_type = 2'd2; end
+            4'd10: begin skill_damage = 6'd15; skill_blast = 4'd25; skill_energy_cost = 4'd10; skill_type = 2'd2; end
+            4'd11: begin skill_damage = 6'd20; skill_blast = 4'd25; skill_energy_cost = 4'd11; skill_type = 2'd2; end
+            4'd12: begin skill_damage = 6'd20; skill_blast = 4'd30; skill_energy_cost = 4'd12; skill_type = 2'd2; end
             // Explosive damage (13-15): single shot, big damage
-            4'd13: begin skill_damage = 6'd40; skill_blast = 4'd4; skill_energy_cost = 4'd13; skill_type = 2'd3; end
-            4'd14: begin skill_damage = 6'd50; skill_blast = 4'd4; skill_energy_cost = 4'd14; skill_type = 2'd3; end
-            4'd15: begin skill_damage = 6'd63; skill_blast = 4'd5; skill_energy_cost = 4'd15; skill_type = 2'd3; end
+            4'd13: begin skill_damage = 6'd40; skill_blast = 4'd15; skill_energy_cost = 4'd13; skill_type = 2'd3; end
+            4'd14: begin skill_damage = 6'd50; skill_blast = 4'd15; skill_energy_cost = 4'd14; skill_type = 2'd3; end
+            4'd15: begin skill_damage = 6'd63; skill_blast = 4'd15; skill_energy_cost = 4'd15; skill_type = 2'd3; end
             default: begin skill_damage = 6'd10; skill_blast = 4'd2; skill_energy_cost = 4'd0; skill_type = 2'd0; end
         endcase
     end
@@ -835,21 +835,21 @@ endfunction
                     proj_vy <= proj_vy + GRAVITY;
                     anim_ticks <= anim_ticks + 1;
 
-                    if (!proj_fx[20] && proj_fx[14:8] < 7'd96)
+                    if (!proj_fx[20] && !(|proj_fx[19:15]) && proj_fx[14:8] < 7'd96)
                         proj_x <= proj_fx[14:8];
-                    if (!proj_fy[20] && proj_fy[13:8] < 7'd64)
+                    if (!proj_fy[20] && !(|proj_fy[19:14]) && proj_fy[13:8] < 7'd64)
                         proj_y <= proj_fy[13:8];
 
-                    if (!proj_fx[20] && proj_fx[14:8] < 7'd96 &&
-                        !proj_fy[20] && proj_fy[13:8] < 7'd64) begin
+                    if (!proj_fx[20] && !(|proj_fx[19:15]) && proj_fx[14:8] < 7'd96 &&
+                        !proj_fy[20] && !(|proj_fy[19:14]) && proj_fy[13:8] < 7'd64) begin
                         trail_wr_en <= 1;
                         trail_wr_x  <= proj_fx[14:8];
                         trail_wr_y  <= proj_fy[13:8];
                     end
 
                     // Check OOB
-                    if (proj_fx[20] || proj_fx[14:8] >= 7'd96 ||
-                        proj_fy[20] || (!proj_fy[20] && proj_fy[13:8] >= 6'd63) ||
+                    if (proj_fx[20] || (|proj_fx[19:15]) || proj_fx[14:8] >= 7'd96 ||
+                        proj_fy[20] || (|proj_fy[19:14]) || proj_fy[13:8] >= 6'd63 ||
                         anim_ticks > 10'd300) begin
                         proj_active  <= 0;
                         game_phase   <= PH_RESOLVE;
@@ -1067,12 +1067,10 @@ endfunction
             
                     player_entity  <= set_hp(player_entity,
                         (next_player_hp[8:2] > 6'd63) ? 6'd63 : next_player_hp[8:2]);
-                    if (!(!current_round && next_enemy_alive == 3'b000)) begin
-                        enemy_entity_0 <= set_hp(enemy_entity_0,
-                            current_round
-                                ? scale_boss_hp_400_to_63(next_enemy_hp0)
-                                : ((next_enemy_hp0 > 9'd63) ? 6'd63 : next_enemy_hp0[5:0]));
-                    end
+                    enemy_entity_0 <= set_hp(enemy_entity_0,
+                        current_round
+                            ? scale_boss_hp_400_to_63(next_enemy_hp0)
+                            : ((next_enemy_hp0 > 9'd63) ? 6'd63 : next_enemy_hp0[5:0]));
                     enemy_entity_1 <= set_hp(enemy_entity_1,
                         (next_enemy_hp1 > 9'd63) ? 6'd63 : next_enemy_hp1[5:0]);
                     enemy_entity_2 <= 46'd0;
