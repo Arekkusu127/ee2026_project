@@ -123,6 +123,7 @@ module game_state(
     reg [2:0] next_enemy_alive;
     reg [5:0] enemy_attack_damage;
     reg boss_beam_hit_player;
+    reg player_hit_boss;
 
     // ---- Projectile physics ----
     reg signed [20:0] proj_fx, proj_fy;
@@ -355,6 +356,7 @@ module game_state(
     // ====== MAIN FSM ======
     always @(posedge clk or posedge rst) begin
         if (rst) begin
+            player_hit_boss  = 0;
             boss_beam_hit_player <= 0;
             boss_attack_active <= 0;
             boss_attack_x     <= 0;
@@ -796,7 +798,7 @@ module game_state(
                             game_phase         <= PH_RESOLVE;
                             resolve_step       <= 0;
                         end else begin
-                            boss_attack_x <= boss_attack_x + 7'd2;
+                            boss_attack_x <= boss_attack_x + 7'd5;
                         end
                     end
                 end else if (tick_30hz) begin
@@ -890,6 +892,7 @@ module game_state(
                     next_enemy_hp1   = real_hp_enemy[1];
                     next_enemy_hp2   = real_hp_enemy[2];
                     next_enemy_alive = enemy_alive;
+                    player_hit_boss  <= 0;
             
                     if (is_player_turn) begin
                         if (explosion_pending) begin
@@ -987,6 +990,7 @@ module game_state(
                                         proj_x < BOSS_SPRITE_LEFT + BOSS_SPRITE_W &&
                                         proj_y >= BOSS_SPRITE_TOP &&
                                         proj_y < BOSS_SPRITE_TOP + BOSS_SPRITE_H) begin
+                                        player_hit_boss = 1;
                                         if (next_enemy_hp0 <= {3'd0, skill_damage}) begin
                                             hit_event           <= 1'b1;
                                             hit_damage          <= next_enemy_hp0[7:0];
@@ -1090,8 +1094,18 @@ module game_state(
                                 else
                                     player_energy <= player_energy + 4'd2;
                                 game_phase     <= PH_MOVE;
-                            end else begin
-                                game_phase <= PH_NEXTTURN;
+                            end 
+                            else if (is_player_turn && player_hit_boss) begin
+                                // Player hit boss -> skip boss beam, go directly back to player move
+                                is_player_turn <= 1'b1;
+                                player_fuel    <= 4'd10;
+                                boss_attack_active <= 1'b0;
+                                boss_attack_x      <= 7'd0;
+                                boss_beam_hit_player  <= 1'b0;
+                                game_phase     <= PH_MOVE;
+                            end
+                            else begin
+                                 game_phase <= PH_NEXTTURN;
                             end
                         end
                         resolve_step <= 0;
