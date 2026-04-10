@@ -334,8 +334,8 @@ module render(
     wire in_bomb = (pix_x >= bomb_left) && (pix_x < bomb_left + 7'd6) &&
                    (pix_y >= bomb_top ) && (pix_y < bomb_top  + 6'd6);
 
-    wire [2:0] bomb_local_x = (pix_x - bomb_left)[2:0];
-    wire [2:0] bomb_local_y = (pix_y - bomb_top )[2:0];
+    wire [2:0] bomb_local_x = (pix_x - bomb_left);
+    wire [2:0] bomb_local_y = (pix_y - bomb_top );
 
     wire [15:0] bomb_pixel;
     wire bomb_vis;
