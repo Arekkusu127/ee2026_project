@@ -954,12 +954,12 @@ endfunction
                                                 slime1_x + 7'd7, slime_y + 6'd4) <= {3'd0, explosion_radius}) begin
                                         if (next_enemy_hp1 <= {3'd0, fire_skill_damage}) begin
                                             hit_event           <= 1'b1;
-                                            hit_damage          <= next_enemy_hp1[7:0];
+                                            hit_damage          = hit_damage + next_enemy_hp1[7:0];
                                             next_enemy_hp1      = 9'd0;
                                             next_enemy_alive[1] = 1'b0;
                                         end else begin
                                             hit_event      <= 1'b1;
-                                            hit_damage     <= {2'd0, fire_skill_damage};
+                                            hit_damage     = hit_damage + {2'd0, fire_skill_damage};
                                             next_enemy_hp1 = next_enemy_hp1 - {3'd0, fire_skill_damage};
                                         end
                                     end
@@ -1055,11 +1055,11 @@ endfunction
                     // Accumulate spread damage (keep existing code)
                     if (is_player_turn && fire_skill_type == 2'd1) begin
                         if (!current_round) begin
-                            spread_dmg_enemy0 <= spread_dmg_enemy0 + (real_hp_enemy[0] - next_enemy_hp0);
-                            spread_dmg_enemy1 <= spread_dmg_enemy1 + (real_hp_enemy[1] - next_enemy_hp1);
+                            spread_dmg_enemy0 = spread_dmg_enemy0 + (real_hp_enemy[0] - next_enemy_hp0);
+                            spread_dmg_enemy1 = spread_dmg_enemy1 + (real_hp_enemy[1] - next_enemy_hp1);
                             hit_damage        <= {1'b0, spread_dmg_enemy0} + {1'b0, spread_dmg_enemy1};
                         end else begin
-                            spread_dmg_boss <= spread_dmg_boss + (real_hp_enemy[0] - next_enemy_hp0);
+                            spread_dmg_boss   = spread_dmg_boss + (real_hp_enemy[0] - next_enemy_hp0);
                             hit_damage        <= {1'b0, spread_dmg_boss};
                         end
                     end
