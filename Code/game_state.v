@@ -52,7 +52,8 @@ module game_state(
     output reg boss_attack_active,
     output reg [6:0] boss_attack_x,
     output reg [6:0] explosion_center_x,
-    output reg [5:0] explosion_center_y
+    output reg [5:0] explosion_center_y,
+    output reg       explosion_pending
 );
 
     localparam PH_INIT     = 3'd0;
@@ -194,7 +195,7 @@ module game_state(
     // ---- Explosive radius for skill types 2,3 ----
     reg [3:0]  effective_blast;
     reg [3:0] explosion_radius;
-    reg       explosion_pending;
+
 
     // ---- Precalculated arc state ----
     reg [1:0]  arc_calc_state;
@@ -378,6 +379,9 @@ endfunction
     // ====== MAIN FSM ======
     always @(posedge clk or posedge rst) begin
         if (rst) begin
+            explosion_center_x <= 7'd0;
+            explosion_center_y <= 6'd0;
+            explosion_pending  <= 1'b0;
             player_hit_boss  = 0;
             boss_beam_hit_player <= 0;
             boss_attack_active <= 0;

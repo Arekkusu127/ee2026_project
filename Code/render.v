@@ -22,6 +22,9 @@
 module render(
     input         CLOCK,
     input         frame_begin,
+    input [6:0]  explosion_center_x,
+    input [5:0]  explosion_center_y,
+    input        explosion_pending,
     input boss_attack_active,
     input [6:0] boss_attack_x,
     input  [6:0]  pix_x,
@@ -320,6 +323,30 @@ module render(
     );  
 
 
+    wire [6:0] bomb_left = (explosion_center_x >= 7'd3) ? (explosion_center_x - 7'd3) : 7'd0;
+    wire [5:0] bomb_top  = (explosion_center_y >= 6'd3) ? (explosion_center_y - 6'd3) : 6'd0;
+
+    wire in_bomb = (pix_x >= bomb_left) && (pix_x < bomb_left + 7'd6) &&
+                   (pix_y >= bomb_top ) && (pix_y < bomb_top  + 6'd6);
+
+    wire [2:0] bomb_local_x = (pix_x - bomb_left)[2:0];
+    wire [2:0] bomb_local_y = (pix_y - bomb_top )[2:0];
+
+    wire [15:0] bomb_pixel;
+    wire bomb_vis;
+
+    bomb bomb_inst(
+        .CLOCK(CLOCK),
+        .rst(!game_started),
+        .frame_begin(frame_begin),
+        .explosion_pending(explosion_pending),
+        .x_pos(bomb_local_x),
+        .y_pos(bomb_local_y),
+        .pixel(bomb_pixel),
+        .visible(bomb_vis)
+    );
+
+
     wire proj_hit = proj_active &&
                     (pix_x >= proj_x) && (pix_x <= proj_x + 7'd1) &&
                     (pix_y >= proj_y) && (pix_y <= proj_y + 6'd1);
@@ -351,6 +378,9 @@ module render(
         end
         else if (proj_hit) begin
             pixel_data = C_PROJ;
+        end
+        else if (in_bomb && bomb_vis) begin
+            pixel_data = bomb_pixel;
         end
         else if (player_hp_filled) begin
             pixel_data = C_HP_FILL;
